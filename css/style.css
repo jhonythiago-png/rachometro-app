@@ -337,6 +337,38 @@ input:focus, select:focus {
   margin-left: 4px;
 }
 
+.team-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 10px;
+  min-height: 100px;
+}
+.team-header {
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.team-header-a { color: var(--orange); }
+.team-header-b { color: var(--cyan); }
+.team-player {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 4px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.team-player:active { background: var(--bg-elevated-2); }
+.team-player .avatar-ring { width: 30px; height: 30px; }
+.team-player .avatar-ring-inner { font-size: 11px; }
+.team-player-info { min-width: 0; }
+.team-player-name { font-size: 12.5px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.team-player-meta { font-size: 10.5px; color: var(--text-dim); }
+
 .toast {
   position: fixed;
   top: 16px; left: 50%;
