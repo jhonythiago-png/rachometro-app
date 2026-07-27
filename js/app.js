@@ -743,7 +743,7 @@ async function handleExcluirDia(sessaoId, dataFormatada) {
 
 // ---------------- SORTEIO ----------------
 
-const PESO_REPETICAO = 2.5;
+const PESO_REPETICAO = 0.75;
 const JANELA_DIAS_ANTI_REPETICAO = 28;
 
 let sorteioState = { partidaId: null, numero: 1, timeA: [], timeB: [] };
