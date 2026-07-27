@@ -128,7 +128,7 @@ input:focus, select:focus {
 .login-error { color: var(--magenta); font-size: 12px; min-height: 16px; margin-bottom: 8px; }
 
 /* ---------- APP SHELL ---------- */
-#app-screen { padding-bottom: 84px; }
+#app-screen { padding-bottom: calc(90px + env(safe-area-inset-bottom)); }
 .topbar {
   background: var(--bg-elevated);
   border-bottom: 1px solid var(--border);
@@ -159,7 +159,7 @@ input:focus, select:focus {
   background: var(--bg-elevated);
   border-top: 1px solid var(--border);
   display: flex;
-  padding: 10px 0 12px;
+  padding: 10px 0 max(12px, env(safe-area-inset-bottom));
   max-width: 480px;
   margin: 0 auto;
 }
@@ -170,10 +170,12 @@ input:focus, select:focus {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 4px;
   font-size: 11px;
   color: var(--text-dim);
-  padding: 4px;
+  padding: 8px 4px;
+  min-height: 48px;
   font-weight: 500;
   position: relative;
 }
@@ -208,6 +210,14 @@ input:focus, select:focus {
   border-radius: 16px;
   padding: 12px 14px;
   margin-bottom: 10px;
+  transition: border-color 0.15s;
+}
+.player-card:active { border-color: var(--border-strong); }
+.edit-hint {
+  font-style: normal;
+  font-size: 11px;
+  color: var(--text-dim);
+  flex-shrink: 0;
 }
 .avatar-ring {
   width: 44px; height: 44px;
@@ -260,23 +270,6 @@ input:focus, select:focus {
   font-size: 20px;
   padding: 4px 8px;
   line-height: 1;
-}
-
-.fab-add {
-  position: fixed;
-  bottom: 92px;
-  right: 20px;
-  width: 54px;
-  height: 54px;
-  border-radius: 50%;
-  background: var(--grad-warm);
-  color: #1A0A05;
-  font-size: 26px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 8px 28px rgba(229, 0, 125, 0.4);
-  max-width: 480px;
 }
 
 /* ---------- DIA DE JOGO ---------- */
