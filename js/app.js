@@ -190,6 +190,7 @@ function resetCadastroForm() {
   editingJogadorId = null;
   document.getElementById('cadastro-titulo').textContent = 'Novo jogador';
   document.getElementById('btn-cancelar-edicao').style.display = 'none';
+  document.getElementById('btn-excluir-jogador').style.display = 'none';
   document.getElementById('btn-salvar-jogador').textContent = 'Salvar jogador';
   document.getElementById('cadastro-nome').value = '';
   const container = document.getElementById('posicoes-container');
@@ -208,6 +209,7 @@ function editarJogador(jogadorId) {
 
   document.getElementById('cadastro-titulo').textContent = 'Editar jogador';
   document.getElementById('btn-cancelar-edicao').style.display = 'inline-block';
+  document.getElementById('btn-excluir-jogador').style.display = 'block';
   document.getElementById('btn-salvar-jogador').textContent = 'Salvar alterações';
   document.getElementById('cadastro-nome').value = jogador.nome;
 
@@ -228,6 +230,30 @@ function editarJogador(jogadorId) {
 }
 
 function cancelarEdicao() {
+  goToElenco();
+}
+
+async function handleExcluirJogador() {
+  if (!editingJogadorId) return;
+  const jogador = elencoCache[editingJogadorId];
+  const nome = jogador ? jogador.nome : 'este jogador';
+
+  if (!confirm(`Remover ${nome} do elenco? Isso não apaga o histórico de jogos já registrados.`)) {
+    return;
+  }
+
+  const { error } = await supabaseClient
+    .from('jogadores')
+    .update({ ativo: false })
+    .eq('id', editingJogadorId);
+
+  if (error) {
+    showToast('Erro ao excluir jogador.');
+    console.error(error);
+    return;
+  }
+
+  showToast('Jogador removido do elenco.');
   goToElenco();
 }
 
