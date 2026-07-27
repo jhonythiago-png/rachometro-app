@@ -113,9 +113,12 @@ async function loadElenco() {
   }
 
   if (!jogadores || jogadores.length === 0) {
+    document.getElementById('elenco-titulo').textContent = 'Elenco';
     listEl.innerHTML = '<p class="empty-state">Nenhum jogador cadastrado ainda.<br>Toque em "Cadastrar" para adicionar o primeiro.</p>';
     return;
   }
+
+  document.getElementById('elenco-titulo').textContent = `Elenco (${jogadores.length})`;
 
   elencoCache = {};
   jogadores.forEach(j => { elencoCache[j.id] = j; });
