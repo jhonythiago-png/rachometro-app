@@ -233,6 +233,7 @@ function editarJogador(jogadorId) {
 }
 
 function cancelarEdicao() {
+  resetCadastroForm();
   goToElenco();
 }
 
@@ -257,6 +258,7 @@ async function handleExcluirJogador() {
   }
 
   showToast('Jogador removido do elenco.');
+  resetCadastroForm();
   goToElenco();
 }
 
@@ -383,6 +385,7 @@ async function handleSalvarJogador() {
     }
 
     showToast('Alterações salvas!');
+    resetCadastroForm();
     goToElenco();
     return;
   }
