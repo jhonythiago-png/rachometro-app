@@ -770,8 +770,6 @@ async function reativarJogador(jogadorId) {
 }
 
 async function handleSortear() {
-  const proximoNumero = sorteioState.partidaId ? sorteioState.numero : sorteioState.numero;
-
   const { data: sessao } = await supabaseClient
     .from('sessoes_jogo')
     .select('jogadores_por_time')
@@ -779,6 +777,22 @@ async function handleSortear() {
     .single();
   const porTime = (sessao && sessao.jogadores_por_time) || 6;
   const necessario = porTime * 2;
+
+  // Se já existe uma partida gerada pra esse número, é um "sortear novamente":
+  // desfaz a escalação atual (devolve os jogadores pro pool) antes de sortear de novo.
+  let partidaId = sorteioState.partidaId;
+  if (partidaId) {
+    const idsAnteriores = [...sorteioState.timeA, ...sorteioState.timeB].map(j => j.id);
+    await supabaseClient.from('historico_parcerias').delete().eq('partida_id', partidaId);
+    await supabaseClient.from('partida_times').delete().eq('partida_id', partidaId);
+    if (idsAnteriores.length > 0) {
+      await supabaseClient
+        .from('checkins')
+        .update({ status: 'disponivel' })
+        .eq('sessao_id', currentSessaoId)
+        .in('jogador_id', idsAnteriores);
+    }
+  }
 
   const { data: checkins, error } = await supabaseClient
     .from('checkins')
@@ -819,30 +833,54 @@ async function handleSortear() {
     }
   });
 
-  const { data: partida, error: errPartida } = await supabaseClient
-    .from('partidas')
-    .insert({ sessao_id: currentSessaoId, numero: proximoNumero })
-    .select()
-    .single();
+  if (!partidaId) {
+    const { data: partida, error: errPartida } = await supabaseClient
+      .from('partidas')
+      .insert({ sessao_id: currentSessaoId, numero: sorteioState.numero })
+      .select()
+      .single();
 
-  if (errPartida) {
-    console.error(errPartida);
-    showToast('Erro ao criar a partida.');
-    return;
+    if (errPartida) {
+      if (errPartida.code === '23505') {
+        const { data: existente } = await supabaseClient
+          .from('partidas')
+          .select('id')
+          .eq('sessao_id', currentSessaoId)
+          .eq('numero', sorteioState.numero)
+          .single();
+        if (existente) {
+          partidaId = existente.id;
+        } else {
+          showToast('Erro ao criar a partida: ' + errPartida.message);
+          return;
+        }
+      } else {
+        console.error(errPartida);
+        showToast('Erro ao criar a partida: ' + errPartida.message);
+        return;
+      }
+    } else {
+      partidaId = partida.id;
+    }
   }
 
   const linhasTimes = [
-    ...teamA.map(j => ({ partida_id: partida.id, time: 'A', jogador_id: j.id })),
-    ...teamB.map(j => ({ partida_id: partida.id, time: 'B', jogador_id: j.id })),
+    ...teamA.map(j => ({ partida_id: partidaId, time: 'A', jogador_id: j.id })),
+    ...teamB.map(j => ({ partida_id: partidaId, time: 'B', jogador_id: j.id })),
   ];
-  await supabaseClient.from('partida_times').insert(linhasTimes);
+  const { error: errLinhas } = await supabaseClient.from('partida_times').insert(linhasTimes);
+  if (errLinhas) {
+    console.error(errLinhas);
+    showToast('Erro ao salvar os times: ' + errLinhas.message);
+    return;
+  }
 
   const parceriasParaGravar = [];
   [teamA, teamB].forEach(time => {
     for (let i = 0; i < time.length; i++) {
       for (let j = i + 1; j < time.length; j++) {
         const [a, b] = [time[i].id, time[j].id].sort();
-        parceriasParaGravar.push({ jogador_a_id: a, jogador_b_id: b, partida_id: partida.id });
+        parceriasParaGravar.push({ jogador_a_id: a, jogador_b_id: b, partida_id: partidaId });
       }
     }
   });
@@ -857,7 +895,7 @@ async function handleSortear() {
     .eq('sessao_id', currentSessaoId)
     .in('jogador_id', idsEscalados);
 
-  sorteioState = { partidaId: partida.id, numero: partida.numero, timeA, timeB, repetidas };
+  sorteioState = { partidaId, numero: sorteioState.numero, timeA, timeB, repetidas };
   renderSorteio();
   await atualizarContadorDisponiveis();
   await carregarJaJogaram();
