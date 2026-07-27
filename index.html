@@ -46,7 +46,10 @@
     </div>
 
     <div id="view-cadastro" class="view">
-      <h2 style="margin-bottom:4px">Novo jogador</h2>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px">
+        <h2 id="cadastro-titulo">Novo jogador</h2>
+        <button type="button" id="btn-cancelar-edicao" class="btn-ghost" style="display:none; padding:6px 12px; font-size:12px" onclick="cancelarEdicao()">Cancelar</button>
+      </div>
       <label class="field-label">Nome</label>
       <input type="text" id="cadastro-nome" placeholder="Nome do jogador">
 
@@ -83,8 +86,6 @@
     </div>
 
   </div>
-
-  <button id="fab-add" class="fab-add" onclick="goToCadastro()" style="display:none">+</button>
 
   <div class="bottom-nav">
     <button id="nav-elenco" class="nav-item active">Elenco</button>
