@@ -57,6 +57,31 @@
       <button type="button" id="btn-salvar-jogador" class="btn-primary" style="width:100%; margin-top:20px">Salvar jogador</button>
     </div>
 
+    <div id="view-dia" class="screen">
+      <h2 style="margin-bottom:4px">Dia de jogo</h2>
+      <p id="dia-data" style="font-size:12px; color:var(--muted); margin:0 0 14px"></p>
+
+      <div class="dia-config">
+        <label class="field-label" style="margin-top:0">Jogadores por time</label>
+        <input type="number" id="input-jogadores-time" min="2" max="11" value="6">
+      </div>
+
+      <div class="dia-section">
+        <div class="dia-section-title">Aguardando chegada</div>
+        <div id="lista-aguardando"></div>
+      </div>
+
+      <div class="dia-section">
+        <div class="dia-section-title">Chegaram</div>
+        <div id="lista-chegaram"></div>
+      </div>
+
+      <div class="dia-section">
+        <div class="dia-section-title">Atrasados</div>
+        <div id="lista-atrasados"></div>
+      </div>
+    </div>
+
   </div>
 
   <button id="fab-add" class="fab-add" onclick="goToCadastro()" style="display:none">+</button>
@@ -64,7 +89,7 @@
   <div class="bottom-nav">
     <button id="nav-elenco" class="nav-item active">Elenco</button>
     <button id="nav-cadastro" class="nav-item">Cadastrar</button>
-    <button id="nav-dia" class="nav-item" disabled>Dia de jogo</button>
+    <button id="nav-dia" class="nav-item">Dia de jogo</button>
     <button id="nav-sorteio" class="nav-item" disabled>Sorteio</button>
   </div>
 </div>
