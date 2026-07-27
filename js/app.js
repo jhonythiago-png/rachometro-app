@@ -88,10 +88,11 @@ async function handleLogout() {
 
 // ---------------- ELENCO ----------------
 
+let elencoCache = {};
+
 function goToElenco() {
   showView('view-elenco');
   setNavActive('nav-elenco');
-  document.getElementById('fab-add').style.display = 'none';
   loadElenco();
 }
 
@@ -101,7 +102,7 @@ async function loadElenco() {
 
   const { data: jogadores, error } = await supabaseClient
     .from('jogadores')
-    .select('id, nome, ativo, jogador_posicoes(posicao, nivel, principal)')
+    .select('id, nome, ativo, jogador_posicoes(id, posicao, nivel, principal)')
     .eq('ativo', true)
     .order('nome');
 
@@ -112,9 +113,12 @@ async function loadElenco() {
   }
 
   if (!jogadores || jogadores.length === 0) {
-    listEl.innerHTML = '<p class="empty-state">Nenhum jogador cadastrado ainda.<br>Toque no + para adicionar o primeiro.</p>';
+    listEl.innerHTML = '<p class="empty-state">Nenhum jogador cadastrado ainda.<br>Toque em "Cadastrar" para adicionar o primeiro.</p>';
     return;
   }
+
+  elencoCache = {};
+  jogadores.forEach(j => { elencoCache[j.id] = j; });
 
   listEl.innerHTML = '';
   jogadores.forEach(j => {
@@ -125,12 +129,15 @@ async function loadElenco() {
 
     const row = document.createElement('div');
     row.className = 'player-card';
+    row.style.cursor = 'pointer';
+    row.onclick = () => editarJogador(j.id);
     row.innerHTML = `
       <div class="avatar-ring"><div class="avatar-ring-inner">${getInitials(j.nome)}</div></div>
       <div class="player-info">
         <div class="player-name">${escapeHtml(j.nome)}</div>
         <div class="player-meta">${posicoes || 'sem posição cadastrada'}</div>
       </div>
+      <i class="edit-hint">editar</i>
     `;
     listEl.appendChild(row);
   });
@@ -167,14 +174,23 @@ const POSICOES = [
 ];
 const OUTRA_POSICAO = '__outra__';
 
+let editingJogadorId = null;
+
 function goToCadastro() {
   showView('view-cadastro');
   setNavActive('nav-cadastro');
-  document.getElementById('fab-add').style.display = 'none';
-  resetCadastroForm();
+  // só reseta se o formulário estiver vazio (não apaga o que já foi preenchido)
+  const container = document.getElementById('posicoes-container');
+  if (container.children.length === 0) {
+    resetCadastroForm();
+  }
 }
 
 function resetCadastroForm() {
+  editingJogadorId = null;
+  document.getElementById('cadastro-titulo').textContent = 'Novo jogador';
+  document.getElementById('btn-cancelar-edicao').style.display = 'none';
+  document.getElementById('btn-salvar-jogador').textContent = 'Salvar jogador';
   document.getElementById('cadastro-nome').value = '';
   const container = document.getElementById('posicoes-container');
   container.innerHTML = '';
@@ -182,26 +198,68 @@ function resetCadastroForm() {
   addPosicaoRow(true);
 }
 
-function addPosicaoRow(principal = false) {
+function editarJogador(jogadorId) {
+  const jogador = elencoCache[jogadorId];
+  if (!jogador) return;
+
+  editingJogadorId = jogadorId;
+  showView('view-cadastro');
+  setNavActive('nav-cadastro');
+
+  document.getElementById('cadastro-titulo').textContent = 'Editar jogador';
+  document.getElementById('btn-cancelar-edicao').style.display = 'inline-block';
+  document.getElementById('btn-salvar-jogador').textContent = 'Salvar alterações';
+  document.getElementById('cadastro-nome').value = jogador.nome;
+
+  const container = document.getElementById('posicoes-container');
+  container.innerHTML = '';
+  posicaoCounter = 0;
+
+  const posicoesOrdenadas = [...(jogador.jogador_posicoes || [])]
+    .sort((a, b) => (b.principal === true) - (a.principal === true));
+
+  if (posicoesOrdenadas.length === 0) {
+    addPosicaoRow(true);
+  } else {
+    posicoesOrdenadas.forEach((p, idx) => {
+      addPosicaoRow(idx === 0, p.posicao, p.nivel);
+    });
+  }
+}
+
+function cancelarEdicao() {
+  goToElenco();
+}
+
+function addPosicaoRow(principal = false, valorInicial = null, nivelInicial = null) {
   posicaoCounter++;
   const id = `posicao-row-${posicaoCounter}`;
   const container = document.getElementById('posicoes-container');
+
+  const ehConhecida = valorInicial && POSICOES.some(p => p.valor === valorInicial);
+  const selecionarOutra = valorInicial && !ehConhecida;
 
   const row = document.createElement('div');
   row.className = 'posicao-row';
   row.id = id;
   row.innerHTML = `
     <select class="posicao-select" onchange="togglePosicaoCustom(this)">
-      ${POSICOES.map(p => `<option value="${p.valor}">${p.label}</option>`).join('')}
-      <option value="${OUTRA_POSICAO}">Outra posição...</option>
+      ${POSICOES.map(p => `<option value="${p.valor}" ${p.valor === valorInicial ? 'selected' : ''}>${p.label}</option>`).join('')}
+      <option value="${OUTRA_POSICAO}" ${selecionarOutra ? 'selected' : ''}>Outra posição...</option>
     </select>
-    <input type="text" class="posicao-custom-input" placeholder="Nome da posição" style="display:none; flex:1.4">
+    <input type="text" class="posicao-custom-input" placeholder="Nome da posição"
+      value="${selecionarOutra ? escapeHtml(formatPosicaoLabel(valorInicial)) : ''}"
+      style="display:${selecionarOutra ? 'block' : 'none'}; flex:1.4">
     <select class="nivel-select">
-      ${[5,4,3,2,1].map(n => `<option value="${n}">Nível ${n}</option>`).join('')}
+      ${[5,4,3,2,1].map(n => `<option value="${n}" ${n === (nivelInicial || 5) ? 'selected' : ''}>Nível ${n}</option>`).join('')}
     </select>
     ${principal ? '' : `<button type="button" class="remove-btn" onclick="document.getElementById('${id}').remove()">&times;</button>`}
   `;
+  if (selecionarOutra) {
+    row.querySelector('.posicao-select').style.display = 'none';
+  }
   container.appendChild(row);
+  row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 function togglePosicaoCustom(selectEl) {
@@ -261,6 +319,45 @@ async function handleSalvarJogador() {
     return;
   }
 
+  if (editingJogadorId) {
+    const { error: errUpdate } = await supabaseClient
+      .from('jogadores')
+      .update({ nome })
+      .eq('id', editingJogadorId);
+
+    if (errUpdate) {
+      showToast('Erro ao salvar alterações.');
+      console.error(errUpdate);
+      return;
+    }
+
+    const { error: errDelete } = await supabaseClient
+      .from('jogador_posicoes')
+      .delete()
+      .eq('jogador_id', editingJogadorId);
+
+    if (errDelete) {
+      showToast('Erro ao atualizar posições.');
+      console.error(errDelete);
+      return;
+    }
+
+    const posicoesParaInserir = posicoes.map(p => ({ ...p, jogador_id: editingJogadorId }));
+    const { error: errInsert } = await supabaseClient
+      .from('jogador_posicoes')
+      .insert(posicoesParaInserir);
+
+    if (errInsert) {
+      showToast('Alterações salvas, mas houve erro nas posições.');
+      console.error(errInsert);
+      return;
+    }
+
+    showToast('Alterações salvas!');
+    goToElenco();
+    return;
+  }
+
   const { data: jogador, error: errJogador } = await supabaseClient
     .from('jogadores')
     .insert({ nome })
@@ -284,8 +381,9 @@ async function handleSalvarJogador() {
     return;
   }
 
-  showToast('Jogador salvo!');
-  goToElenco();
+  showToast('Jogador salvo! Pode cadastrar o próximo.');
+  resetCadastroForm();
+  document.getElementById('cadastro-nome').focus();
 }
 
 // ---------------- DIA DE JOGO ----------------
@@ -300,7 +398,6 @@ function hojeISO() {
 async function goToDia() {
   showView('view-dia');
   setNavActive('nav-dia');
-  document.getElementById('fab-add').style.display = 'none';
   await loadDia();
 }
 
