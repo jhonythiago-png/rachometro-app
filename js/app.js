@@ -795,6 +795,7 @@ async function loadSorteio() {
         const posEncontrada = base.posicoesTodas.find(p => p.posicao === row.posicao);
         base.posicaoSlot = formatPosicaoLabel(row.posicao);
         base.nivelSlot = posEncontrada ? posEncontrada.nivel : base.nivel;
+        base.posicaoJogada = row.posicao;
       }
       return base;
     };
@@ -1281,9 +1282,27 @@ function renderSorteio() {
   }
 }
 
-function renderTimeColuna(listaId, mediaId, time, letra) {
+const ORDEM_EXIBICAO_FORMACAO = [
+  'goleiro', 'zagueiro', 'cabeca-de-area', 'meio-campo',
+  'lateral-esquerda', 'lateral-direita', 'centroavante'
+];
+
+function ordenarPorFormacao(time) {
+  return [...time].sort((a, b) => {
+    const slugA = a.posicaoJogada || a.posicaoPrincipal || '';
+    const slugB = b.posicaoJogada || b.posicaoPrincipal || '';
+    let idxA = ORDEM_EXIBICAO_FORMACAO.indexOf(slugA);
+    let idxB = ORDEM_EXIBICAO_FORMACAO.indexOf(slugB);
+    if (idxA === -1) idxA = 99;
+    if (idxB === -1) idxB = 99;
+    return idxA - idxB;
+  });
+}
+
+function renderTimeColuna(listaId, mediaId, timeOriginal, letra) {
   const el = document.getElementById(listaId);
   el.innerHTML = '';
+  const time = ordenarPorFormacao(timeOriginal);
   const media = time.length ? (time.reduce((s, j) => s + j.nivel, 0) / time.length).toFixed(1) : '0.0';
   document.getElementById(mediaId).textContent = `média ${media}`;
 
