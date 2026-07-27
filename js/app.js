@@ -669,7 +669,7 @@ async function loadSorteio() {
   if (ultimaPartida) {
     const { data: times, error: errTimes } = await supabaseClient
       .from('partida_times')
-      .select('time, jogador_id, jogadores(id, nome, jogador_posicoes(posicao, nivel, principal))')
+      .select('time, jogador_id, posicao, jogadores(id, nome, jogador_posicoes(posicao, nivel, principal))')
       .eq('partida_id', ultimaPartida.id);
 
     if (errTimes) {
@@ -678,7 +678,15 @@ async function loadSorteio() {
       return;
     }
 
-    const paraJogador = (row) => montarJogadorComNivel(row.jogadores);
+    const paraJogador = (row) => {
+      const base = montarJogadorComNivel(row.jogadores);
+      if (row.posicao) {
+        const posEncontrada = base.posicoesTodas.find(p => p.posicao === row.posicao);
+        base.posicaoSlot = formatPosicaoLabel(row.posicao);
+        base.nivelSlot = posEncontrada ? posEncontrada.nivel : base.nivel;
+      }
+      return base;
+    };
     sorteioState.partidaId = ultimaPartida.id;
     sorteioState.numero = ultimaPartida.numero;
     sorteioState.timeA = (times || []).filter(t => t.time === 'A').map(paraJogador);
@@ -705,7 +713,8 @@ function montarJogadorComNivel(jogador) {
     id: jogador.id,
     nome: jogador.nome,
     nivel: principal ? principal.nivel : 3,
-    posicaoLabel: principal ? formatPosicaoLabel(principal.posicao) : 'sem posição'
+    posicaoLabel: principal ? formatPosicaoLabel(principal.posicao) : 'sem posição',
+    posicoesTodas: posicoes.map(p => ({ posicao: p.posicao, nivel: p.nivel }))
   };
 }
 
@@ -833,7 +842,7 @@ async function handleSortear() {
 
   const parceriaMap = await buscarHistoricoParcerias(selecionados.map(s => s.id));
   console.log('[sorteio] parceriaMap tamanho:', parceriaMap.size);
-  const { teamA, teamB } = balancearTimes(selecionados, parceriaMap);
+  const { teamA, teamB } = montarTimes(selecionados, parceriaMap, porTime);
   console.log('[sorteio] teamA:', teamA.length, 'teamB:', teamB.length);
 
   let repetidas = 0;
@@ -880,9 +889,14 @@ async function handleSortear() {
     }
   }
 
+  const posicaoSalva = (j) => {
+    if (!j.posicaoSlot) return null;
+    const conhecida = POSICOES.find(p => p.label === j.posicaoSlot);
+    return conhecida ? conhecida.valor : j.posicaoSlot.toLowerCase();
+  };
   const linhasTimes = [
-    ...teamA.map(j => ({ partida_id: partidaId, time: 'A', jogador_id: j.id })),
-    ...teamB.map(j => ({ partida_id: partidaId, time: 'B', jogador_id: j.id })),
+    ...teamA.map(j => ({ partida_id: partidaId, time: 'A', jogador_id: j.id, posicao: posicaoSalva(j) })),
+    ...teamB.map(j => ({ partida_id: partidaId, time: 'B', jogador_id: j.id, posicao: posicaoSalva(j) })),
   ];
   const { error: errLinhas } = await supabaseClient.from('partida_times').insert(linhasTimes);
   if (errLinhas) {
@@ -939,6 +953,74 @@ async function buscarHistoricoParcerias(idsCandidatos) {
     mapa.set(key, (mapa.get(key) || 0) + 1);
   });
   return mapa;
+}
+
+const FORMACAO_CAMPO_SUICO = [
+  'goleiro', 'zagueiro', 'cabeca-de-area', 'meio-campo', 'meio-campo',
+  'lateral-esquerda', 'lateral-direita', 'centroavante'
+];
+
+function penalidadeRepeticao(candidato, time, parceriaMap) {
+  let total = 0;
+  time.forEach(t => {
+    const key = [candidato.id, t.id].sort().join('_');
+    total += (parceriaMap.get(key) || 0) * PESO_REPETICAO;
+  });
+  return total;
+}
+
+function montarTimes(selecionadosOriginais, parceriaMap, porTime) {
+  if (porTime !== 8) {
+    return balancearTimes(selecionadosOriginais, parceriaMap);
+  }
+
+  const selecionados = selecionadosOriginais.map((j, idx) => ({ ...j, ordem: idx }));
+  let pool = [...selecionados];
+  const teamA = [];
+  const teamB = [];
+  let somaA = 0, somaB = 0;
+
+  FORMACAO_CAMPO_SUICO.forEach(slot => {
+    const elegiveis = pool
+      .map(j => {
+        const posSlot = j.posicoesTodas.find(p => p.posicao === slot);
+        return posSlot ? { jogador: j, nivelSlot: posSlot.nivel } : null;
+      })
+      .filter(Boolean)
+      .sort((a, b) => b.nivelSlot - a.nivelSlot || a.jogador.ordem - b.jogador.ordem || (Math.random() - 0.5));
+
+    const escolhidos = elegiveis.slice(0, 2);
+    escolhidos.forEach(({ jogador, nivelSlot }) => {
+      const jogadorComSlot = { ...jogador, posicaoSlot: formatPosicaoLabel(slot), nivelSlot };
+      const custoA = somaA + nivelSlot + penalidadeRepeticao(jogador, teamA, parceriaMap);
+      const custoB = somaB + nivelSlot + penalidadeRepeticao(jogador, teamB, parceriaMap);
+
+      let vaiPara;
+      if (teamA.length >= porTime) vaiPara = 'B';
+      else if (teamB.length >= porTime) vaiPara = 'A';
+      else vaiPara = custoA <= custoB ? 'A' : 'B';
+
+      if (vaiPara === 'A') { teamA.push(jogadorComSlot); somaA += nivelSlot; }
+      else { teamB.push(jogadorComSlot); somaB += nivelSlot; }
+      pool = pool.filter(p => p.id !== jogador.id);
+    });
+  });
+
+  // sobra (quem não coube em nenhuma vaga da formação) preenche o resto por nível geral
+  pool
+    .sort((a, b) => b.nivel - a.nivel)
+    .forEach(j => {
+      if (teamA.length >= porTime && teamB.length >= porTime) return;
+      const custoA = somaA + j.nivel + penalidadeRepeticao(j, teamA, parceriaMap);
+      const custoB = somaB + j.nivel + penalidadeRepeticao(j, teamB, parceriaMap);
+      if (teamA.length < porTime && (teamB.length >= porTime || custoA <= custoB)) {
+        teamA.push(j); somaA += j.nivel;
+      } else if (teamB.length < porTime) {
+        teamB.push(j); somaB += j.nivel;
+      }
+    });
+
+  return { teamA, teamB };
 }
 
 function embaralhar(array) {
@@ -1013,7 +1095,7 @@ function renderTimeColuna(listaId, mediaId, time, letra) {
       <div class="avatar-ring"><div class="avatar-ring-inner">${getInitials(j.nome)}</div></div>
       <div class="team-player-info">
         <div class="team-player-name">${escapeHtml(j.nome)}</div>
-        <div class="team-player-meta">${j.posicaoLabel} · nível ${j.nivel}</div>
+        <div class="team-player-meta">${j.posicaoSlot || j.posicaoLabel} · nível ${j.nivelSlot ?? j.nivel}</div>
       </div>
     `;
     el.appendChild(row);
