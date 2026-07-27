@@ -924,8 +924,17 @@ async function buscarHistoricoParcerias(idsCandidatos) {
   return mapa;
 }
 
+function embaralhar(array) {
+  const copia = [...array];
+  for (let i = copia.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copia[i], copia[j]] = [copia[j], copia[i]];
+  }
+  return copia;
+}
+
 function balancearTimes(jogadores, parceriaMap) {
-  const ordenados = [...jogadores].sort((a, b) => b.nivel - a.nivel);
+  const ordenados = embaralhar(jogadores).sort((a, b) => b.nivel - a.nivel);
   const teamA = [];
   const teamB = [];
   let somaA = 0;
@@ -941,8 +950,8 @@ function balancearTimes(jogadores, parceriaMap) {
   }
 
   ordenados.forEach(p => {
-    const custoA = somaA + p.nivel + penalidade(p, teamA);
-    const custoB = somaB + p.nivel + penalidade(p, teamB);
+    const custoA = somaA + p.nivel + penalidade(p, teamA) + Math.random() * 0.3;
+    const custoB = somaB + p.nivel + penalidade(p, teamB) + Math.random() * 0.3;
     if (custoA < custoB || (custoA === custoB && teamA.length <= teamB.length)) {
       teamA.push(p); somaA += p.nivel;
     } else {
@@ -996,11 +1005,18 @@ function renderTimeColuna(listaId, mediaId, time, letra) {
 
 async function trocarJogadorDeTime(jogadorId, timeAtual) {
   const origem = timeAtual === 'A' ? sorteioState.timeA : sorteioState.timeB;
+  const jogador = origem.find(j => j.id === jogadorId);
+  if (!jogador) return;
+
+  const nomeTimeDestino = timeAtual === 'A' ? 'azul' : 'laranja';
+  if (!confirm(`Mover ${jogador.nome} para o time ${nomeTimeDestino}?`)) {
+    return;
+  }
+
   const destino = timeAtual === 'A' ? sorteioState.timeB : sorteioState.timeA;
   const idx = origem.findIndex(j => j.id === jogadorId);
-  if (idx === -1) return;
-  const [jogador] = origem.splice(idx, 1);
-  destino.push(jogador);
+  const [jogadorMovido] = origem.splice(idx, 1);
+  destino.push(jogadorMovido);
 
   renderSorteio();
 
