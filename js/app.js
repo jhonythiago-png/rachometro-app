@@ -120,7 +120,7 @@ async function loadElenco() {
   jogadores.forEach(j => {
     const posicoes = (j.jogador_posicoes || [])
       .sort((a, b) => (b.principal === true) - (a.principal === true))
-      .map(p => `${p.posicao} (nível ${p.nivel})`)
+      .map(p => `${formatPosicaoLabel(p.posicao)} (nível ${p.nivel})`)
       .join(' · ');
 
     const row = document.createElement('div');
@@ -141,9 +141,24 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
+function formatPosicaoLabel(valor) {
+  const conhecida = POSICOES.find(p => p.valor === valor);
+  if (conhecida) return conhecida.label;
+  return valor.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
+
 // ---------------- CADASTRO ----------------
 
-const POSICOES = ['goleiro', 'zagueiro', 'meio-campo', 'atacante'];
+const POSICOES = [
+  { valor: 'goleiro', label: 'Goleiro' },
+  { valor: 'zagueiro', label: 'Zagueiro' },
+  { valor: 'cabeca-de-area', label: 'Cabeça de Área' },
+  { valor: 'meio-campo', label: 'Meio de Campo' },
+  { valor: 'lateral-esquerda', label: 'Lateral Esquerda' },
+  { valor: 'lateral-direita', label: 'Lateral Direita' },
+  { valor: 'centroavante', label: 'Centroavante' },
+];
+const OUTRA_POSICAO = '__outra__';
 
 function goToCadastro() {
   showView('view-cadastro');
@@ -169,9 +184,11 @@ function addPosicaoRow(principal = false) {
   row.className = 'posicao-row';
   row.id = id;
   row.innerHTML = `
-    <select class="posicao-select">
-      ${POSICOES.map(p => `<option value="${p}">${capitalize(p)}</option>`).join('')}
+    <select class="posicao-select" onchange="togglePosicaoCustom(this)">
+      ${POSICOES.map(p => `<option value="${p.valor}">${p.label}</option>`).join('')}
+      <option value="${OUTRA_POSICAO}">Outra posição...</option>
     </select>
+    <input type="text" class="posicao-custom-input" placeholder="Nome da posição" style="display:none; flex:1.4">
     <select class="nivel-select">
       ${[5,4,3,2,1].map(n => `<option value="${n}">Nível ${n}</option>`).join('')}
     </select>
@@ -180,8 +197,25 @@ function addPosicaoRow(principal = false) {
   container.appendChild(row);
 }
 
-function capitalize(str) {
-  return str.charAt(0).toUpperCase() + str.slice(1);
+function togglePosicaoCustom(selectEl) {
+  const row = selectEl.closest('.posicao-row');
+  const customInput = row.querySelector('.posicao-custom-input');
+  if (selectEl.value === OUTRA_POSICAO) {
+    selectEl.style.display = 'none';
+    customInput.style.display = 'block';
+    customInput.focus();
+  } else {
+    customInput.style.display = 'none';
+    selectEl.style.display = 'block';
+  }
+}
+
+function getPosicaoRowValue(row) {
+  const select = row.querySelector('.posicao-select');
+  if (select.value === OUTRA_POSICAO) {
+    return row.querySelector('.posicao-custom-input').value.trim().toLowerCase();
+  }
+  return select.value;
 }
 
 async function handleSalvarJogador() {
@@ -197,17 +231,25 @@ async function handleSalvarJogador() {
   let temErro = false;
 
   rows.forEach((row, idx) => {
-    const posicao = row.querySelector('.posicao-select').value;
+    const posicao = getPosicaoRowValue(row);
     const nivel = parseInt(row.querySelector('.nivel-select').value, 10);
+    if (!posicao) {
+      temErro = 'vazio';
+      return;
+    }
     if (posicoesVistas.has(posicao)) {
-      temErro = true;
+      temErro = 'duplicada';
       return;
     }
     posicoesVistas.add(posicao);
     posicoes.push({ posicao, nivel, principal: idx === 0 });
   });
 
-  if (temErro) {
+  if (temErro === 'vazio') {
+    showToast('Preencha o nome da posição personalizada.');
+    return;
+  }
+  if (temErro === 'duplicada') {
     showToast('Não repita a mesma posição duas vezes.');
     return;
   }
