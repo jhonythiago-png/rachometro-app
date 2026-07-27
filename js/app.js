@@ -911,7 +911,7 @@ async function handleSortear() {
     .eq('sessao_id', currentSessaoId)
     .in('jogador_id', idsEscalados);
 
-  sorteioState = { partidaId, numero: sorteioState.numero, timeA, timeB, repetidas };
+  sorteioState = { partidaId, numero: sorteioState.numero, timeA: teamA, timeB: teamB, repetidas };
   console.log('[sorteio] concluído com sucesso', sorteioState);
   renderSorteio();
   await atualizarContadorDisponiveis();
