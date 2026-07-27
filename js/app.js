@@ -14,6 +14,11 @@ function showScreen(id) {
   document.getElementById(id).classList.add('active');
 }
 
+function showView(id) {
+  document.querySelectorAll('.view').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
 function setNavActive(navId) {
   document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
   const btn = document.getElementById(navId);
@@ -42,10 +47,13 @@ async function checkSession() {
   }
 }
 
+const DOMINIO_LOGIN = 'rachometro.com';
+
 async function handleLogin(e) {
   e.preventDefault();
   console.log('[login] submit disparado');
-  const email = document.getElementById('login-email').value.trim();
+  const digitado = document.getElementById('login-email').value.trim();
+  const email = digitado.includes('@') ? digitado : `${digitado}@${DOMINIO_LOGIN}`;
   const senha = document.getElementById('login-senha').value;
   const errorEl = document.getElementById('login-error');
   errorEl.textContent = '';
@@ -81,7 +89,7 @@ async function handleLogout() {
 // ---------------- ELENCO ----------------
 
 function goToElenco() {
-  showScreen('view-elenco');
+  showView('view-elenco');
   setNavActive('nav-elenco');
   document.getElementById('fab-add').style.display = 'none';
   loadElenco();
@@ -138,7 +146,7 @@ function escapeHtml(str) {
 const POSICOES = ['goleiro', 'zagueiro', 'meio-campo', 'atacante'];
 
 function goToCadastro() {
-  showScreen('view-cadastro');
+  showView('view-cadastro');
   setNavActive('nav-cadastro');
   document.getElementById('fab-add').style.display = 'none';
   resetCadastroForm();
@@ -241,7 +249,7 @@ function hojeISO() {
 }
 
 async function goToDia() {
-  showScreen('view-dia');
+  showView('view-dia');
   setNavActive('nav-dia');
   document.getElementById('fab-add').style.display = 'none';
   await loadDia();
