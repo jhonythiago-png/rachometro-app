@@ -435,7 +435,7 @@ async function ensureSessaoHoje() {
 
   const { data: existente, error: errBusca } = await supabaseClient
     .from('sessoes_jogo')
-    .select('id, jogadores_por_time, data')
+    .select('id, jogadores_por_time, data, modo_selecao')
     .eq('data', hoje)
     .eq('status', 'aberta')
     .maybeSingle();
@@ -450,7 +450,7 @@ async function ensureSessaoHoje() {
   const { data: nova, error: errCriar } = await supabaseClient
     .from('sessoes_jogo')
     .insert({ data: hoje, jogadores_por_time: 6, status: 'aberta' })
-    .select('id, jogadores_por_time, data')
+    .select('id, jogadores_por_time, data, modo_selecao')
     .single();
 
   if (errCriar) {
@@ -475,6 +475,9 @@ async function loadDia() {
 
   const inputTime = document.getElementById('input-jogadores-time');
   inputTime.value = sessao.jogadores_por_time;
+
+  const selectModo = document.getElementById('select-modo-selecao');
+  selectModo.value = sessao.modo_selecao || 'ordem_chegada';
 
   const { data: jogadores, error: errJog } = await supabaseClient
     .from('jogadores')
@@ -628,6 +631,22 @@ async function handleJogadoresPorTimeChange() {
     console.error(error);
     showToast('Erro ao salvar quantidade por time.');
   }
+}
+
+async function handleModoSelecaoChange() {
+  const valor = document.getElementById('select-modo-selecao').value;
+
+  const { error } = await supabaseClient
+    .from('sessoes_jogo')
+    .update({ modo_selecao: valor })
+    .eq('id', currentSessaoId);
+
+  if (error) {
+    console.error(error);
+    showToast('Erro ao salvar o modo de seleção.');
+    return;
+  }
+  showToast(valor === 'aleatorio' ? 'Agora sorteia aleatório entre quem chegou no horário.' : 'Voltou pra ordem de chegada.');
 }
 
 // ---------------- HISTÓRICO ----------------
@@ -948,13 +967,14 @@ async function handleSortear() {
 
   const { data: sessao, error: errSessao } = await supabaseClient
     .from('sessoes_jogo')
-    .select('jogadores_por_time')
+    .select('jogadores_por_time, modo_selecao')
     .eq('id', currentSessaoId)
     .single();
   console.log('[sorteio] sessao:', sessao, errSessao);
   const porTime = (sessao && sessao.jogadores_por_time) || 6;
+  const modoSelecao = (sessao && sessao.modo_selecao) || 'ordem_chegada';
   const necessario = porTime * 2;
-  console.log('[sorteio] porTime:', porTime, 'necessario:', necessario);
+  console.log('[sorteio] porTime:', porTime, 'necessario:', necessario, 'modo:', modoSelecao);
 
   let partidaId = sorteioState.partidaId;
   console.log('[sorteio] sorteioState atual:', JSON.stringify(sorteioState));
@@ -989,10 +1009,20 @@ async function handleSortear() {
     return;
   }
 
-  const candidatos = (checkins || [])
+  const candidatosComAtraso = (checkins || [])
     .filter(c => c.jogadores && c.jogadores.ativo)
-    .map(c => montarJogadorComNivel(c.jogadores));
-  console.log('[sorteio] candidatos montados:', candidatos.length, candidatos);
+    .map(c => ({ ...montarJogadorComNivel(c.jogadores), atrasado: c.atrasado }));
+
+  let naoAtrasados = candidatosComAtraso.filter(c => !c.atrasado);
+  let atrasados = candidatosComAtraso.filter(c => c.atrasado);
+
+  if (modoSelecao === 'aleatorio') {
+    naoAtrasados = embaralhar(naoAtrasados);
+    atrasados = embaralhar(atrasados);
+  }
+
+  const candidatos = [...naoAtrasados, ...atrasados];
+  console.log('[sorteio] candidatos montados:', candidatos.length, 'modo:', modoSelecao);
 
   if (candidatos.length < 2) {
     console.log('[sorteio] candidatos insuficientes');
@@ -1416,6 +1446,7 @@ on('btn-sortear', 'click', handleSortear);
 on('btn-nova-partida', 'click', handleNovaPartida);
 on('btn-resetar-sorteio', 'click', handleResetarSorteio);
 on('input-jogadores-time', 'change', handleJogadoresPorTimeChange);
+on('select-modo-selecao', 'change', handleModoSelecaoChange);
 on('btn-add-posicao', 'click', () => addPosicaoRow(false));
 on('btn-salvar-jogador', 'click', handleSalvarJogador);
 
