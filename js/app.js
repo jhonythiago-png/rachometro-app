@@ -681,63 +681,95 @@ async function loadHistorico() {
   container.innerHTML = '';
 
   for (const sessao of sessoes) {
-    const { data: partidas } = await supabaseClient
+    const { count } = await supabaseClient
       .from('partidas')
-      .select('id, numero')
-      .eq('sessao_id', sessao.id)
-      .order('numero');
+      .select('*', { count: 'exact', head: true })
+      .eq('sessao_id', sessao.id);
 
     const dataFormatada = new Date(sessao.data + 'T12:00:00').toLocaleDateString('pt-BR', {
       day: '2-digit', month: 'long', year: 'numeric'
     });
+    const totalPartidas = count || 0;
+    const resumo = totalPartidas === 0 ? 'sem partidas sorteadas' : `${totalPartidas} partida${totalPartidas > 1 ? 's' : ''}`;
 
-    const bloco = document.createElement('div');
-    bloco.className = 'historico-dia';
+    const card = document.createElement('div');
+    card.className = 'historico-card';
+    card.id = `historico-card-${sessao.id}`;
+    card.innerHTML = `
+      <div class="historico-card-header" onclick="toggleHistoricoDia('${sessao.id}')">
+        <div>
+          <div class="historico-card-data">${dataFormatada}</div>
+          <div class="historico-card-resumo">${resumo}</div>
+        </div>
+        <i class="ti ti-chevron-down historico-card-seta" id="seta-${sessao.id}" aria-hidden="true"></i>
+      </div>
+      <div class="historico-card-conteudo" id="conteudo-${sessao.id}" style="display:none"></div>
+    `;
+    container.appendChild(card);
+  }
+}
 
-    let conteudoPartidas = '';
-    if (!partidas || partidas.length === 0) {
-      conteudoPartidas = '<p class="empty-state">Nenhuma partida sorteada nesse dia.</p>';
-    } else {
-      for (const partida of partidas) {
-        const { data: times } = await supabaseClient
-          .from('partida_times')
-          .select('time, posicao, jogadores(nome)')
-          .eq('partida_id', partida.id);
+async function toggleHistoricoDia(sessaoId) {
+  const conteudo = document.getElementById(`conteudo-${sessaoId}`);
+  const seta = document.getElementById(`seta-${sessaoId}`);
+  const abrindo = conteudo.style.display === 'none';
 
-        const teamA = (times || []).filter(t => t.time === 'A' && t.jogadores);
-        const teamB = (times || []).filter(t => t.time === 'B' && t.jogadores);
+  conteudo.style.display = abrindo ? 'block' : 'none';
+  seta.style.transform = abrindo ? 'rotate(180deg)' : 'rotate(0deg)';
 
-        const listar = (time) => time
-          .map(t => `<div class="historico-jogador">${escapeHtml(t.jogadores.nome)}${t.posicao ? ' · ' + formatPosicaoLabel(t.posicao) : ''}</div>`)
-          .join('') || '<div class="historico-jogador">—</div>';
+  if (abrindo && !conteudo.dataset.carregado) {
+    conteudo.innerHTML = '<p class="empty-state">Carregando...</p>';
+    await renderConteudoDia(sessaoId, conteudo);
+    conteudo.dataset.carregado = '1';
+  }
+}
 
-        conteudoPartidas += `
-          <div class="historico-partida">
-            <div class="historico-partida-titulo">${partida.numero}º jogo</div>
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px">
-              <div>
-                <div class="team-header team-header-a" style="margin-bottom:6px">Laranja</div>
-                ${listar(teamA)}
-              </div>
-              <div>
-                <div class="team-header team-header-b" style="margin-bottom:6px">Azul</div>
-                ${listar(teamB)}
-              </div>
+async function renderConteudoDia(sessaoId, conteudoEl) {
+  const { data: partidas } = await supabaseClient
+    .from('partidas')
+    .select('id, numero')
+    .eq('sessao_id', sessaoId)
+    .order('numero');
+
+  let html = '';
+  if (!partidas || partidas.length === 0) {
+    html = '<p class="empty-state">Nenhuma partida sorteada nesse dia.</p>';
+  } else {
+    for (const partida of partidas) {
+      const { data: times } = await supabaseClient
+        .from('partida_times')
+        .select('time, posicao, jogadores(nome)')
+        .eq('partida_id', partida.id);
+
+      const teamA = (times || []).filter(t => t.time === 'A' && t.jogadores);
+      const teamB = (times || []).filter(t => t.time === 'B' && t.jogadores);
+
+      const listar = (time) => time
+        .map(t => `<div class="historico-jogador">${escapeHtml(t.jogadores.nome)}${t.posicao ? ' · ' + formatPosicaoLabel(t.posicao) : ''}</div>`)
+        .join('') || '<div class="historico-jogador">—</div>';
+
+      html += `
+        <div class="historico-partida">
+          <div class="historico-partida-titulo">${partida.numero}º jogo</div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px">
+            <div>
+              <div class="team-header team-header-a" style="margin-bottom:6px">Laranja</div>
+              ${listar(teamA)}
+            </div>
+            <div>
+              <div class="team-header team-header-b" style="margin-bottom:6px">Azul</div>
+              ${listar(teamB)}
             </div>
           </div>
-        `;
-      }
+        </div>
+      `;
     }
-
-    bloco.innerHTML = `
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding-bottom:6px; border-bottom:1px solid var(--border-strong)">
-        <div class="historico-dia-titulo" style="border:none; padding:0; margin:0">${dataFormatada}</div>
-        <button type="button" class="btn-ghost" style="padding:5px 10px; font-size:11px; color:var(--magenta); border-color:var(--magenta)" onclick="handleExcluirDia('${sessao.id}', '${dataFormatada}')">Excluir dia</button>
-      </div>
-      ${conteudoPartidas}
-    `;
-    container.appendChild(bloco);
   }
+
+  const dataFormatada = document.querySelector(`#historico-card-${sessaoId} .historico-card-data`).textContent;
+  html += `<button type="button" class="btn-ghost historico-btn-excluir" onclick="event.stopPropagation(); handleExcluirDia('${sessaoId}', '${dataFormatada}')">Excluir dia</button>`;
+
+  conteudoEl.innerHTML = html;
 }
 
 async function handleExcluirDia(sessaoId, dataFormatada) {
