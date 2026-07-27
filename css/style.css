@@ -172,9 +172,9 @@ input:focus, select:focus {
   align-items: center;
   justify-content: center;
   gap: 4px;
-  font-size: 11px;
+  font-size: 10px;
   color: var(--text-dim);
-  padding: 8px 4px;
+  padding: 8px 2px;
   min-height: 48px;
   font-weight: 500;
   position: relative;
@@ -368,6 +368,64 @@ input:focus, select:focus {
 .team-player-info { min-width: 0; }
 .team-player-name { font-size: 12.5px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .team-player-meta { font-size: 10.5px; color: var(--text-dim); }
+
+.historico-dia {
+  margin-bottom: 20px;
+}
+.historico-dia-titulo {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-strong);
+}
+.historico-partida {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+}
+.historico-partida-titulo {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.historico-jogador {
+  font-size: 12px;
+  color: var(--text);
+  padding: 3px 0;
+}
+
+.status-banner {
+  border-radius: 14px;
+  padding: 12px 14px;
+  font-size: 12.5px;
+  margin-bottom: 14px;
+  border: 1px solid var(--border);
+}
+.status-banner.ok { background: var(--ok-bg); color: var(--ok-text); border-color: transparent; }
+.status-banner.falta { background: var(--warn-bg); color: var(--warn-text); border-color: transparent; }
+
+.disponivel-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12.5px;
+}
+.disponivel-row:last-child { border-bottom: none; }
+.badge-sobra {
+  background: var(--bg-elevated-2);
+  color: var(--muted);
+  font-size: 10px;
+  padding: 3px 9px;
+  border-radius: 20px;
+}
 
 .toast {
   position: fixed;
