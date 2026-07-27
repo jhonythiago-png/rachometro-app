@@ -710,9 +710,35 @@ async function loadHistorico() {
       }
     }
 
-    bloco.innerHTML = `<div class="historico-dia-titulo">${dataFormatada}</div>${conteudoPartidas}`;
+    bloco.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding-bottom:6px; border-bottom:1px solid var(--border-strong)">
+        <div class="historico-dia-titulo" style="border:none; padding:0; margin:0">${dataFormatada}</div>
+        <button type="button" class="btn-ghost" style="padding:5px 10px; font-size:11px; color:var(--magenta); border-color:var(--magenta)" onclick="handleExcluirDia('${sessao.id}', '${dataFormatada}')">Excluir dia</button>
+      </div>
+      ${conteudoPartidas}
+    `;
     container.appendChild(bloco);
   }
+}
+
+async function handleExcluirDia(sessaoId, dataFormatada) {
+  if (!confirm(`Excluir todo o histórico de ${dataFormatada}? Isso apaga as partidas, os check-ins e não pode ser desfeito.`)) {
+    return;
+  }
+
+  const { error } = await supabaseClient
+    .from('sessoes_jogo')
+    .delete()
+    .eq('id', sessaoId);
+
+  if (error) {
+    console.error(error);
+    showToast('Erro ao excluir esse dia.');
+    return;
+  }
+
+  showToast('Dia excluído.');
+  await loadHistorico();
 }
 
 // ---------------- SORTEIO ----------------
