@@ -799,6 +799,7 @@ function montarJogadorComNivel(jogador) {
     nome: jogador.nome,
     nivel: principal ? principal.nivel : 3,
     posicaoLabel: principal ? formatPosicaoLabel(principal.posicao) : 'sem posição',
+    posicaoPrincipal: principal ? principal.posicao : null,
     posicoesTodas: posicoes.map(p => ({ posicao: p.posicao, nivel: p.nivel }))
   };
 }
@@ -1025,11 +1026,7 @@ async function handleSortear() {
     }
   }
 
-  const posicaoSalva = (j) => {
-    if (!j.posicaoSlot) return null;
-    const conhecida = POSICOES.find(p => p.label === j.posicaoSlot);
-    return conhecida ? conhecida.valor : j.posicaoSlot.toLowerCase();
-  };
+  const posicaoSalva = (j) => j.posicaoJogada || null;
   const linhasTimes = [
     ...teamA.map(j => ({ partida_id: partidaId, time: 'A', jogador_id: j.id, posicao: posicaoSalva(j) })),
     ...teamB.map(j => ({ partida_id: partidaId, time: 'B', jogador_id: j.id, posicao: posicaoSalva(j) })),
@@ -1127,7 +1124,7 @@ function montarTimes(selecionadosOriginais, parceriaMap, porTime) {
 
     const escolhidos = elegiveis.slice(0, 2);
     escolhidos.forEach(({ jogador, nivelSlot }) => {
-      const jogadorComSlot = { ...jogador, posicaoSlot: formatPosicaoLabel(slot), nivelSlot };
+      const jogadorComSlot = { ...jogador, posicaoSlot: formatPosicaoLabel(slot), posicaoJogada: slot, nivelSlot };
       const custoA = somaA + nivelSlot + penalidadeRepeticao(jogador, teamA, parceriaMap);
       const custoB = somaB + nivelSlot + penalidadeRepeticao(jogador, teamB, parceriaMap);
 
@@ -1145,8 +1142,9 @@ function montarTimes(selecionadosOriginais, parceriaMap, porTime) {
   // sobra (quem não coube em nenhuma vaga da formação) preenche o resto por nível geral
   pool
     .sort((a, b) => b.nivel - a.nivel)
-    .forEach(j => {
+    .forEach(jOriginal => {
       if (teamA.length >= porTime && teamB.length >= porTime) return;
+      const j = { ...jOriginal, posicaoJogada: jOriginal.posicaoPrincipal };
       const custoA = somaA + j.nivel + penalidadeRepeticao(j, teamA, parceriaMap);
       const custoB = somaB + j.nivel + penalidadeRepeticao(j, teamB, parceriaMap);
       if (teamA.length < porTime && (teamB.length >= porTime || custoA <= custoB)) {
@@ -1184,7 +1182,8 @@ function balancearTimes(jogadores, parceriaMap) {
     return total;
   }
 
-  ordenados.forEach(p => {
+  ordenados.forEach(pOriginal => {
+    const p = { ...pOriginal, posicaoJogada: pOriginal.posicaoPrincipal };
     const custoA = somaA + p.nivel + penalidade(p, teamA) + Math.random() * 0.3;
     const custoB = somaB + p.nivel + penalidade(p, teamB) + Math.random() * 0.3;
     if (custoA < custoB || (custoA === custoB && teamA.length <= teamB.length)) {
@@ -1278,6 +1277,38 @@ async function handleNovaPartida() {
   await atualizarContadorDisponiveis();
 }
 
+async function handleResetarSorteio() {
+  if (!confirm('Reiniciar o sorteio de hoje? Isso apaga todas as partidas já sorteadas hoje e libera todo mundo de volta pra "disponível". O check-in de quem chegou continua valendo.')) {
+    return;
+  }
+
+  const { error: errDelete } = await supabaseClient
+    .from('partidas')
+    .delete()
+    .eq('sessao_id', currentSessaoId);
+
+  if (errDelete) {
+    console.error(errDelete);
+    showToast('Erro ao reiniciar o sorteio.');
+    return;
+  }
+
+  const { error: errCheckins } = await supabaseClient
+    .from('checkins')
+    .update({ status: 'disponivel' })
+    .eq('sessao_id', currentSessaoId);
+
+  if (errCheckins) {
+    console.error(errCheckins);
+    showToast('Partidas apagadas, mas houve erro ao liberar os jogadores.');
+    return;
+  }
+
+  sorteioState = { partidaId: null, numero: 1, timeA: [], timeB: [] };
+  showToast('Sorteio do dia reiniciado!');
+  await loadSorteio();
+}
+
 // ---------------- INIT ----------------
 
 function on(id, event, handler) {
@@ -1299,6 +1330,7 @@ on('nav-sorteio', 'click', goToSorteio);
 on('nav-historico', 'click', goToHistorico);
 on('btn-sortear', 'click', handleSortear);
 on('btn-nova-partida', 'click', handleNovaPartida);
+on('btn-resetar-sorteio', 'click', handleResetarSorteio);
 on('input-jogadores-time', 'change', handleJogadoresPorTimeChange);
 on('btn-add-posicao', 'click', () => addPosicaoRow(false));
 on('btn-salvar-jogador', 'click', handleSalvarJogador);
