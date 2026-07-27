@@ -770,18 +770,24 @@ async function reativarJogador(jogadorId) {
 }
 
 async function handleSortear() {
-  const { data: sessao } = await supabaseClient
+  console.log('[sorteio] botão clicado');
+  console.log('[sorteio] currentSessaoId:', currentSessaoId);
+
+  const { data: sessao, error: errSessao } = await supabaseClient
     .from('sessoes_jogo')
     .select('jogadores_por_time')
     .eq('id', currentSessaoId)
     .single();
+  console.log('[sorteio] sessao:', sessao, errSessao);
   const porTime = (sessao && sessao.jogadores_por_time) || 6;
   const necessario = porTime * 2;
+  console.log('[sorteio] porTime:', porTime, 'necessario:', necessario);
 
-  // Se já existe uma partida gerada pra esse número, é um "sortear novamente":
-  // desfaz a escalação atual (devolve os jogadores pro pool) antes de sortear de novo.
   let partidaId = sorteioState.partidaId;
+  console.log('[sorteio] sorteioState atual:', JSON.stringify(sorteioState));
+
   if (partidaId) {
+    console.log('[sorteio] regerando partida existente', partidaId);
     const idsAnteriores = [...sorteioState.timeA, ...sorteioState.timeB].map(j => j.id);
     await supabaseClient.from('historico_parcerias').delete().eq('partida_id', partidaId);
     await supabaseClient.from('partida_times').delete().eq('partida_id', partidaId);
@@ -802,26 +808,33 @@ async function handleSortear() {
     .order('atrasado', { ascending: true })
     .order('horario_chegada', { ascending: true });
 
+  console.log('[sorteio] checkins disponiveis:', checkins, error);
+
   if (error) {
-    console.error(error);
-    showToast('Erro ao buscar jogadores disponíveis.');
+    console.error('[sorteio] erro ao buscar checkins', error);
+    showToast('Erro ao buscar jogadores disponíveis: ' + error.message);
     return;
   }
 
   const candidatos = (checkins || [])
     .filter(c => c.jogadores && c.jogadores.ativo)
     .map(c => montarJogadorComNivel(c.jogadores));
+  console.log('[sorteio] candidatos montados:', candidatos.length, candidatos);
 
   if (candidatos.length < 2) {
+    console.log('[sorteio] candidatos insuficientes');
     showToast('Não há jogadores suficientes disponíveis ainda.');
     return;
   }
 
   let selecionados = candidatos.slice(0, necessario);
   if (selecionados.length % 2 !== 0) selecionados.pop();
+  console.log('[sorteio] selecionados:', selecionados.length);
 
   const parceriaMap = await buscarHistoricoParcerias(selecionados.map(s => s.id));
+  console.log('[sorteio] parceriaMap tamanho:', parceriaMap.size);
   const { teamA, teamB } = balancearTimes(selecionados, parceriaMap);
+  console.log('[sorteio] teamA:', teamA.length, 'teamB:', teamB.length);
 
   let repetidas = 0;
   [teamA, teamB].forEach(time => {
@@ -834,11 +847,14 @@ async function handleSortear() {
   });
 
   if (!partidaId) {
+    console.log('[sorteio] criando nova partida numero', sorteioState.numero);
     const { data: partida, error: errPartida } = await supabaseClient
       .from('partidas')
       .insert({ sessao_id: currentSessaoId, numero: sorteioState.numero })
       .select()
       .single();
+
+    console.log('[sorteio] resultado insert partida:', partida, errPartida);
 
     if (errPartida) {
       if (errPartida.code === '23505') {
@@ -896,6 +912,7 @@ async function handleSortear() {
     .in('jogador_id', idsEscalados);
 
   sorteioState = { partidaId, numero: sorteioState.numero, timeA, timeB, repetidas };
+  console.log('[sorteio] concluído com sucesso', sorteioState);
   renderSorteio();
   await atualizarContadorDisponiveis();
   await carregarJaJogaram();
