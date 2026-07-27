@@ -89,9 +89,11 @@
     <div id="view-sorteio" class="view">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px">
         <h2 id="sorteio-titulo">Sorteio</h2>
-        <span id="sorteio-disponiveis" style="font-size:12px; color:var(--muted)"></span>
       </div>
-      <p style="font-size:12px; color:var(--muted); margin:0 0 16px">Toque em um jogador pra trocar ele de time.</p>
+      <p style="font-size:12px; color:var(--muted); margin:0 0 14px">Toque em um jogador escalado pra trocar ele de time.</p>
+
+      <div id="sorteio-status-banner"></div>
+      <div id="sorteio-lista-disponiveis" style="margin-bottom:16px"></div>
 
       <div id="sorteio-vazio"></div>
 
@@ -118,6 +120,11 @@
       </div>
     </div>
 
+    <div id="view-historico" class="view">
+      <h2 style="margin-bottom:12px">Histórico</h2>
+      <div id="historico-lista"></div>
+    </div>
+
   </div>
 
   <div class="bottom-nav">
@@ -125,6 +132,7 @@
     <button id="nav-cadastro" class="nav-item">Cadastrar</button>
     <button id="nav-dia" class="nav-item">Dia de jogo</button>
     <button id="nav-sorteio" class="nav-item">Sorteio</button>
+    <button id="nav-historico" class="nav-item">Histórico</button>
   </div>
 </div>
 
