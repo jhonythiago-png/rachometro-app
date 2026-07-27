@@ -71,6 +71,9 @@ input, select {
 .screen { display: none; min-height: 100vh; }
 .screen.active { display: block; }
 
+.view { display: none; }
+.view.active { display: block; }
+
 /* ---------- LOGIN ---------- */
 #login-screen {
   display: flex;
@@ -186,6 +189,68 @@ input, select {
   justify-content: center;
   box-shadow: 0 2px 8px rgba(0,0,0,0.2);
   max-width: 480px;
+}
+
+/* ---------- DIA DE JOGO ---------- */
+.dia-config {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  margin-bottom: 18px;
+}
+.dia-config input { max-width: 100px; }
+.dia-section { margin-bottom: 18px; }
+.dia-section-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 8px;
+}
+.checkin-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.checkin-row:last-child { border-bottom: none; }
+.checkin-actions { display: flex; gap: 6px; }
+.btn-chegou {
+  background: var(--ok-bg);
+  color: var(--ok-text);
+  font-size: 12px;
+  padding: 7px 10px;
+}
+.btn-atrasado {
+  background: var(--warn-bg);
+  color: var(--warn-text);
+  font-size: 12px;
+  padding: 7px 10px;
+}
+.badge-chegou {
+  background: var(--ok-bg);
+  color: var(--ok-text);
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: var(--radius);
+}
+.badge-atrasado {
+  background: var(--warn-bg);
+  color: var(--warn-text);
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: var(--radius);
+}
+.btn-remover-checkin {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 16px;
+  padding: 2px 6px;
+  margin-left: 6px;
 }
 
 .toast {
