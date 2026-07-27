@@ -20,7 +20,7 @@
     <h1>Rachômetro</h1>
     <p>Entre com seu acesso de administrador</p>
     <form id="login-form">
-      <input type="email" id="login-email" placeholder="Email" required>
+      <input type="text" id="login-email" placeholder="Usuário (ex: jhony)" required autocapitalize="none" autocorrect="off">
       <input type="password" id="login-senha" placeholder="Senha" required>
       <div class="login-error" id="login-error"></div>
       <button type="submit" class="btn-primary" style="width:100%">Entrar</button>
@@ -40,12 +40,12 @@
 
   <div class="content">
 
-    <div id="view-elenco" class="screen">
+    <div id="view-elenco" class="view">
       <h2 style="margin-bottom:12px">Elenco</h2>
       <div id="lista-elenco"></div>
     </div>
 
-    <div id="view-cadastro" class="screen">
+    <div id="view-cadastro" class="view">
       <h2 style="margin-bottom:4px">Novo jogador</h2>
       <label class="field-label">Nome</label>
       <input type="text" id="cadastro-nome" placeholder="Nome do jogador">
@@ -57,7 +57,7 @@
       <button type="button" id="btn-salvar-jogador" class="btn-primary" style="width:100%; margin-top:20px">Salvar jogador</button>
     </div>
 
-    <div id="view-dia" class="screen">
+    <div id="view-dia" class="view">
       <h2 style="margin-bottom:4px">Dia de jogo</h2>
       <p id="dia-data" style="font-size:12px; color:var(--muted); margin:0 0 14px"></p>
 
