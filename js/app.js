@@ -44,25 +44,31 @@ async function checkSession() {
 
 async function handleLogin(e) {
   e.preventDefault();
+  console.log('[login] submit disparado');
   const email = document.getElementById('login-email').value.trim();
   const senha = document.getElementById('login-senha').value;
   const errorEl = document.getElementById('login-error');
   errorEl.textContent = '';
+  console.log('[login] email:', email);
 
   try {
     if (!window.supabase || !supabaseClient) {
+      console.log('[login] supabaseClient ausente');
       errorEl.textContent = 'Erro ao carregar a biblioteca do Supabase. Recarregue a página.';
       return;
     }
-    const { error } = await supabaseClient.auth.signInWithPassword({ email, password: senha });
+    console.log('[login] chamando signInWithPassword...');
+    const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password: senha });
+    console.log('[login] resposta recebida', { data, error });
     if (error) {
       errorEl.textContent = 'Não foi possível entrar: ' + error.message;
       return;
     }
+    console.log('[login] sucesso, indo pro app');
     showScreen('app-screen');
     goToElenco();
   } catch (err) {
-    console.error(err);
+    console.error('[login] excecao', err);
     errorEl.textContent = 'Erro inesperado: ' + err.message;
   }
 }
@@ -434,14 +440,24 @@ async function handleJogadoresPorTimeChange() {
 
 // ---------------- INIT ----------------
 
-document.getElementById('login-form').addEventListener('submit', handleLogin);
-document.getElementById('logout-btn').addEventListener('click', handleLogout);
-document.getElementById('nav-elenco').addEventListener('click', goToElenco);
-document.getElementById('nav-cadastro').addEventListener('click', goToCadastro);
-document.getElementById('nav-dia').addEventListener('click', goToDia);
-document.getElementById('input-jogadores-time').addEventListener('change', handleJogadoresPorTimeChange);
-document.getElementById('btn-add-posicao').addEventListener('click', () => addPosicaoRow(false));
-document.getElementById('btn-salvar-jogador').addEventListener('click', handleSalvarJogador);
+function on(id, event, handler) {
+  const el = document.getElementById(id);
+  if (!el) {
+    console.warn(`Elemento #${id} não encontrado (index.html desatualizado?).`);
+    return;
+  }
+  el.addEventListener(event, handler);
+  console.log(`[init] listener registrado em #${id}`);
+}
+
+on('login-form', 'submit', handleLogin);
+on('logout-btn', 'click', handleLogout);
+on('nav-elenco', 'click', goToElenco);
+on('nav-cadastro', 'click', goToCadastro);
+on('nav-dia', 'click', goToDia);
+on('input-jogadores-time', 'change', handleJogadoresPorTimeChange);
+on('btn-add-posicao', 'click', () => addPosicaoRow(false));
+on('btn-salvar-jogador', 'click', handleSalvarJogador);
 
 checkSession();
 
