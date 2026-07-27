@@ -124,15 +124,22 @@ async function loadElenco() {
       .join(' · ');
 
     const row = document.createElement('div');
-    row.className = 'player-row';
+    row.className = 'player-card';
     row.innerHTML = `
-      <div>
+      <div class="avatar-ring"><div class="avatar-ring-inner">${getInitials(j.nome)}</div></div>
+      <div class="player-info">
         <div class="player-name">${escapeHtml(j.nome)}</div>
         <div class="player-meta">${posicoes || 'sem posição cadastrada'}</div>
       </div>
     `;
     listEl.appendChild(row);
   });
+}
+
+function getInitials(nome) {
+  const partes = nome.trim().split(/\s+/);
+  const iniciais = partes.slice(0, 2).map(p => p.charAt(0).toUpperCase());
+  return iniciais.join('');
 }
 
 function escapeHtml(str) {
@@ -393,9 +400,12 @@ function renderCheckinLists(jogadores, checkinMap) {
   } else {
     aguardando.forEach(j => {
       const row = document.createElement('div');
-      row.className = 'checkin-row';
+      row.className = 'checkin-card';
       row.innerHTML = `
-        <span class="player-name">${escapeHtml(j.nome)}</span>
+        <div class="checkin-left">
+          <div class="avatar-ring avatar-ring-sm"><div class="avatar-ring-inner">${getInitials(j.nome)}</div></div>
+          <span class="player-name">${escapeHtml(j.nome)}</span>
+        </div>
         <div class="checkin-actions">
           <button class="btn-chegou" onclick="fazerCheckin('${j.id}', false)">Chegou</button>
           <button class="btn-atrasado" onclick="fazerCheckin('${j.id}', true)">Atrasado</button>
@@ -410,9 +420,12 @@ function renderCheckinLists(jogadores, checkinMap) {
   } else {
     chegaram.forEach(j => {
       const row = document.createElement('div');
-      row.className = 'checkin-row';
+      row.className = 'checkin-card';
       row.innerHTML = `
-        <span class="player-name">${escapeHtml(j.nome)}</span>
+        <div class="checkin-left">
+          <div class="avatar-ring avatar-ring-sm"><div class="avatar-ring-inner">${getInitials(j.nome)}</div></div>
+          <span class="player-name">${escapeHtml(j.nome)}</span>
+        </div>
         <div class="checkin-actions">
           <span class="badge-chegou">chegou</span>
           <button class="btn-remover-checkin" onclick="removerCheckin('${j.id}')">&times;</button>
@@ -427,9 +440,12 @@ function renderCheckinLists(jogadores, checkinMap) {
   } else {
     atrasados.forEach(j => {
       const row = document.createElement('div');
-      row.className = 'checkin-row';
+      row.className = 'checkin-card';
       row.innerHTML = `
-        <span class="player-name">${escapeHtml(j.nome)}</span>
+        <div class="checkin-left">
+          <div class="avatar-ring avatar-ring-sm"><div class="avatar-ring-inner">${getInitials(j.nome)}</div></div>
+          <span class="player-name">${escapeHtml(j.nome)}</span>
+        </div>
         <div class="checkin-actions">
           <span class="badge-atrasado">atrasado</span>
           <button class="btn-remover-checkin" onclick="removerCheckin('${j.id}')">&times;</button>
