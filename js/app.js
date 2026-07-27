@@ -1114,8 +1114,8 @@ async function buscarHistoricoParcerias(idsCandidatos) {
   return mapa;
 }
 
-const FORMACAO_CAMPO_SUICO = [
-  'goleiro', 'zagueiro', 'cabeca-de-area', 'meio-campo', 'meio-campo',
+const SLOTS_UNICOS = [
+  'goleiro', 'zagueiro', 'cabeca-de-area', 'meio-campo',
   'lateral-esquerda', 'lateral-direita', 'centroavante'
 ];
 
@@ -1139,33 +1139,48 @@ function montarTimes(selecionadosOriginais, parceriaMap, porTime) {
   const teamB = [];
   let somaA = 0, somaB = 0;
 
-  FORMACAO_CAMPO_SUICO.forEach(slot => {
-    const elegiveis = pool
-      .map(j => {
-        const posSlot = j.posicoesTodas.find(p => p.posicao === slot);
-        return posSlot ? { jogador: j, nivelSlot: posSlot.nivel } : null;
-      })
-      .filter(Boolean)
-      .sort((a, b) => b.nivelSlot - a.nivelSlot || a.jogador.ordem - b.jogador.ordem || (Math.random() - 0.5));
-
-    const escolhidos = elegiveis.slice(0, 2);
-    escolhidos.forEach(({ jogador, nivelSlot }) => {
-      const jogadorComSlot = { ...jogador, posicaoSlot: formatPosicaoLabel(slot), posicaoJogada: slot, nivelSlot };
-      const custoA = somaA + nivelSlot + penalidadeRepeticao(jogador, teamA, parceriaMap);
-      const custoB = somaB + nivelSlot + penalidadeRepeticao(jogador, teamB, parceriaMap);
-
-      let vaiPara;
-      if (teamA.length >= porTime) vaiPara = 'B';
-      else if (teamB.length >= porTime) vaiPara = 'A';
-      else vaiPara = custoA <= custoB ? 'A' : 'B';
-
-      if (vaiPara === 'A') { teamA.push(jogadorComSlot); somaA += nivelSlot; }
-      else { teamB.push(jogadorComSlot); somaB += nivelSlot; }
-      pool = pool.filter(p => p.id !== jogador.id);
-    });
+  // quantas vagas de cada posição CADA time precisa (meio-campo tem 2)
+  const necessidade = { A: {}, B: {} };
+  SLOTS_UNICOS.forEach(slot => {
+    const qtd = slot === 'meio-campo' ? 2 : 1;
+    necessidade.A[slot] = qtd;
+    necessidade.B[slot] = qtd;
   });
 
-  // sobra (quem não coube em nenhuma vaga da formação) preenche o resto por nível geral
+  function elegiveisPara(slot) {
+    return pool
+      .map(j => {
+        const posSlot = j.posicoesTodas.find(p => p.posicao === slot);
+        return posSlot ? { jogador: j, nivelComRuido: posSlot.nivel + Math.random() * 0.4, nivelSlot: posSlot.nivel } : null;
+      })
+      .filter(Boolean)
+      .sort((a, b) => b.nivelComRuido - a.nivelComRuido || a.jogador.ordem - b.jogador.ordem);
+  }
+
+  function atribuir(jogador, nivelSlot, slot, time) {
+    const jogadorComSlot = { ...jogador, posicaoSlot: formatPosicaoLabel(slot), posicaoJogada: slot, nivelSlot };
+    if (time === 'A') { teamA.push(jogadorComSlot); somaA += nivelSlot; }
+    else { teamB.push(jogadorComSlot); somaB += nivelSlot; }
+    necessidade[time][slot]--;
+    pool = pool.filter(p => p.id !== jogador.id);
+  }
+
+  SLOTS_UNICOS.forEach(slot => {
+    const vezes = slot === 'meio-campo' ? 2 : 1;
+    for (let v = 0; v < vezes; v++) {
+      // o time que está mais atrás na soma de nível tem prioridade de escolha nessa vaga
+      const ordemTimes = somaA <= somaB ? ['A', 'B'] : ['B', 'A'];
+      ordemTimes.forEach(time => {
+        if (necessidade[time][slot] <= 0) return;
+        const elegiveis = elegiveisPara(slot);
+        if (elegiveis.length === 0) return;
+        const escolhido = elegiveis[0];
+        atribuir(escolhido.jogador, escolhido.nivelSlot, slot, time);
+      });
+    }
+  });
+
+  // sobra (posições sem elegível suficiente pra completar os dois times) preenche por nível geral
   pool
     .sort((a, b) => b.nivel - a.nivel)
     .forEach(jOriginal => {
