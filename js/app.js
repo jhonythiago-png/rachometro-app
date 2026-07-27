@@ -630,6 +630,91 @@ async function handleJogadoresPorTimeChange() {
   }
 }
 
+// ---------------- HISTÓRICO ----------------
+
+async function goToHistorico() {
+  showView('view-historico');
+  setNavActive('nav-historico');
+  await loadHistorico();
+}
+
+async function loadHistorico() {
+  const container = document.getElementById('historico-lista');
+  container.innerHTML = '<p class="empty-state">Carregando histórico...</p>';
+
+  const { data: sessoes, error } = await supabaseClient
+    .from('sessoes_jogo')
+    .select('id, data')
+    .order('data', { ascending: false })
+    .limit(30);
+
+  if (error) {
+    console.error(error);
+    container.innerHTML = '<p class="empty-state">Erro ao carregar o histórico.</p>';
+    return;
+  }
+
+  if (!sessoes || sessoes.length === 0) {
+    container.innerHTML = '<p class="empty-state">Nenhum dia de jogo registrado ainda.</p>';
+    return;
+  }
+
+  container.innerHTML = '';
+
+  for (const sessao of sessoes) {
+    const { data: partidas } = await supabaseClient
+      .from('partidas')
+      .select('id, numero')
+      .eq('sessao_id', sessao.id)
+      .order('numero');
+
+    const dataFormatada = new Date(sessao.data + 'T12:00:00').toLocaleDateString('pt-BR', {
+      day: '2-digit', month: 'long', year: 'numeric'
+    });
+
+    const bloco = document.createElement('div');
+    bloco.className = 'historico-dia';
+
+    let conteudoPartidas = '';
+    if (!partidas || partidas.length === 0) {
+      conteudoPartidas = '<p class="empty-state">Nenhuma partida sorteada nesse dia.</p>';
+    } else {
+      for (const partida of partidas) {
+        const { data: times } = await supabaseClient
+          .from('partida_times')
+          .select('time, posicao, jogadores(nome)')
+          .eq('partida_id', partida.id);
+
+        const teamA = (times || []).filter(t => t.time === 'A' && t.jogadores);
+        const teamB = (times || []).filter(t => t.time === 'B' && t.jogadores);
+
+        const listar = (time) => time
+          .map(t => `<div class="historico-jogador">${escapeHtml(t.jogadores.nome)}${t.posicao ? ' · ' + formatPosicaoLabel(t.posicao) : ''}</div>`)
+          .join('') || '<div class="historico-jogador">—</div>';
+
+        conteudoPartidas += `
+          <div class="historico-partida">
+            <div class="historico-partida-titulo">${partida.numero}º jogo</div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px">
+              <div>
+                <div class="team-header team-header-a" style="margin-bottom:6px">Laranja</div>
+                ${listar(teamA)}
+              </div>
+              <div>
+                <div class="team-header team-header-b" style="margin-bottom:6px">Azul</div>
+                ${listar(teamB)}
+              </div>
+            </div>
+          </div>
+        `;
+      }
+    }
+
+    bloco.innerHTML = `<div class="historico-dia-titulo">${dataFormatada}</div>${conteudoPartidas}`;
+    container.appendChild(bloco);
+  }
+}
+
 // ---------------- SORTEIO ----------------
 
 const PESO_REPETICAO = 2.5;
@@ -719,13 +804,64 @@ function montarJogadorComNivel(jogador) {
 }
 
 async function atualizarContadorDisponiveis() {
-  const { count } = await supabaseClient
-    .from('checkins')
-    .select('*', { count: 'exact', head: true })
-    .eq('sessao_id', currentSessaoId)
-    .eq('status', 'disponivel');
+  const { data: sessao } = await supabaseClient
+    .from('sessoes_jogo')
+    .select('jogadores_por_time')
+    .eq('id', currentSessaoId)
+    .single();
+  const porTime = (sessao && sessao.jogadores_por_time) || 6;
+  const necessario = porTime * 2;
 
-  document.getElementById('sorteio-disponiveis').textContent = `${count || 0} disponíveis`;
+  const { data: disponiveis, error } = await supabaseClient
+    .from('checkins')
+    .select('jogador_id, atrasado, horario_chegada, jogadores(nome)')
+    .eq('sessao_id', currentSessaoId)
+    .eq('status', 'disponivel')
+    .order('atrasado', { ascending: true })
+    .order('horario_chegada', { ascending: true });
+
+  const banner = document.getElementById('sorteio-status-banner');
+  const lista = document.getElementById('sorteio-lista-disponiveis');
+
+  if (error || !disponiveis) {
+    banner.innerHTML = '';
+    lista.innerHTML = '';
+    return;
+  }
+
+  const total = disponiveis.length;
+  const ehPrimeiraPartida = sorteioState.numero <= 1 && !sorteioState.partidaId;
+
+  if (total === 0) {
+    banner.innerHTML = `<div class="status-banner falta">Nenhum jogador disponível ainda. Volte em "Dia de jogo" e faça o check-in de quem chegou.</div>`;
+  } else if (total >= necessario) {
+    banner.innerHTML = `<div class="status-banner ok">${total} disponíveis — dá pra fechar os dois times (precisa de ${necessario}).</div>`;
+  } else {
+    const faltam = necessario - total;
+    banner.innerHTML = `<div class="status-banner falta">Só ${total} disponíveis — faltam ${faltam} pro próximo jogo. Reative alguém em "Já jogaram" abaixo, ou aguarde mais chegadas.</div>`;
+  }
+
+  lista.innerHTML = '';
+  if (total > 0) {
+    const titulo = document.createElement('div');
+    titulo.className = 'section-title';
+    titulo.textContent = `Disponíveis para o próximo sorteio (${total})`;
+    lista.appendChild(titulo);
+
+    disponiveis.forEach(c => {
+      const nome = c.jogadores ? c.jogadores.nome : '—';
+      let badge = '';
+      if (c.atrasado) {
+        badge = '<span class="badge-atrasado">atrasado</span>';
+      } else if (!ehPrimeiraPartida) {
+        badge = '<span class="badge-sobra">sobrou do jogo anterior</span>';
+      }
+      const row = document.createElement('div');
+      row.className = 'disponivel-row';
+      row.innerHTML = `<span>${escapeHtml(nome)}</span>${badge}`;
+      lista.appendChild(row);
+    });
+  }
 }
 
 async function carregarJaJogaram() {
@@ -1160,6 +1296,7 @@ on('nav-elenco', 'click', goToElenco);
 on('nav-cadastro', 'click', goToCadastro);
 on('nav-dia', 'click', goToDia);
 on('nav-sorteio', 'click', goToSorteio);
+on('nav-historico', 'click', goToHistorico);
 on('btn-sortear', 'click', handleSortear);
 on('btn-nova-partida', 'click', handleNovaPartida);
 on('input-jogadores-time', 'change', handleJogadoresPorTimeChange);
