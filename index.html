@@ -86,13 +86,45 @@
       </div>
     </div>
 
+    <div id="view-sorteio" class="view">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px">
+        <h2 id="sorteio-titulo">Sorteio</h2>
+        <span id="sorteio-disponiveis" style="font-size:12px; color:var(--muted)"></span>
+      </div>
+      <p style="font-size:12px; color:var(--muted); margin:0 0 16px">Toque em um jogador pra trocar ele de time.</p>
+
+      <div id="sorteio-vazio"></div>
+
+      <div id="sorteio-times" style="display:none">
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px">
+          <div class="team-card team-a">
+            <div class="team-header team-header-a">Time laranja <span id="time-a-media"></span></div>
+            <div id="time-a-lista"></div>
+          </div>
+          <div class="team-card team-b">
+            <div class="team-header team-header-b">Time azul <span id="time-b-media"></span></div>
+            <div id="time-b-lista"></div>
+          </div>
+        </div>
+        <p id="sorteio-anti-repeticao" style="font-size:11px; color:var(--text-dim); margin:0 0 14px"></p>
+      </div>
+
+      <button type="button" id="btn-sortear" class="btn-primary" style="width:100%; margin-bottom:10px">Sortear times</button>
+      <button type="button" id="btn-nova-partida" class="btn-ghost" style="width:100%; display:none; margin-bottom:20px">Nova partida (próximo jogo)</button>
+
+      <div id="ja-jogaram-section" style="display:none">
+        <div class="section-title">Já jogaram — reativar se faltar gente</div>
+        <div id="lista-ja-jogaram"></div>
+      </div>
+    </div>
+
   </div>
 
   <div class="bottom-nav">
     <button id="nav-elenco" class="nav-item active">Elenco</button>
     <button id="nav-cadastro" class="nav-item">Cadastrar</button>
     <button id="nav-dia" class="nav-item">Dia de jogo</button>
-    <button id="nav-sorteio" class="nav-item" disabled>Sorteio</button>
+    <button id="nav-sorteio" class="nav-item">Sorteio</button>
   </div>
 </div>
 
