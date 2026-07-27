@@ -76,7 +76,6 @@ input, select {
 
 /* ---------- LOGIN ---------- */
 #login-screen {
-  display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
