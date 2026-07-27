@@ -379,20 +379,54 @@ input:focus, select:focus {
 .team-player-name { font-size: 12.5px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .team-player-meta { font-size: 10.5px; color: var(--text-dim); }
 
-.historico-dia {
-  margin-bottom: 20px;
+.historico-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  margin-bottom: 10px;
+  overflow: hidden;
 }
-.historico-dia-titulo {
+.historico-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px;
+  cursor: pointer;
+}
+.historico-card-data {
   font-family: 'Space Grotesk', sans-serif;
   font-size: 14px;
   font-weight: 600;
   color: var(--text);
-  margin-bottom: 8px;
-  padding-bottom: 6px;
-  border-bottom: 1px solid var(--border-strong);
+}
+.historico-card-resumo {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.historico-card-seta {
+  font-size: 18px;
+  color: var(--text-dim);
+  transition: transform 0.2s;
+  flex-shrink: 0;
+}
+.historico-card-conteudo {
+  padding: 0 16px 16px;
+  border-top: 1px solid var(--border);
+}
+.historico-card-conteudo .historico-partida {
+  margin-top: 12px;
+}
+.historico-btn-excluir {
+  width: 100%;
+  margin-top: 6px;
+  color: var(--magenta);
+  border-color: var(--magenta);
+  font-size: 12px;
+  padding: 8px;
 }
 .historico-partida {
-  background: var(--bg-elevated);
+  background: var(--bg-elevated-2);
   border: 1px solid var(--border);
   border-radius: 14px;
   padding: 12px 14px;
