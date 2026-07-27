@@ -627,6 +627,365 @@ async function handleJogadoresPorTimeChange() {
   }
 }
 
+// ---------------- SORTEIO ----------------
+
+const PESO_REPETICAO = 2.5;
+const JANELA_DIAS_ANTI_REPETICAO = 28;
+
+let sorteioState = { partidaId: null, numero: 1, timeA: [], timeB: [] };
+
+async function goToSorteio() {
+  showView('view-sorteio');
+  setNavActive('nav-sorteio');
+  await loadSorteio();
+}
+
+async function loadSorteio() {
+  const sessao = await ensureSessaoHoje();
+  if (!sessao) {
+    showToast('Erro ao abrir o dia de jogo.');
+    return;
+  }
+  currentSessaoId = sessao.id;
+
+  const { data: partidas, error: errPartidas } = await supabaseClient
+    .from('partidas')
+    .select('id, numero')
+    .eq('sessao_id', currentSessaoId)
+    .order('numero', { ascending: false })
+    .limit(1);
+
+  if (errPartidas) {
+    console.error(errPartidas);
+    showToast('Erro ao carregar o sorteio.');
+    return;
+  }
+
+  const ultimaPartida = partidas && partidas[0];
+
+  if (ultimaPartida) {
+    const { data: times, error: errTimes } = await supabaseClient
+      .from('partida_times')
+      .select('time, jogador_id, jogadores(id, nome, jogador_posicoes(posicao, nivel, principal))')
+      .eq('partida_id', ultimaPartida.id);
+
+    if (errTimes) {
+      console.error(errTimes);
+      showToast('Erro ao carregar os times.');
+      return;
+    }
+
+    const paraJogador = (row) => montarJogadorComNivel(row.jogadores);
+    sorteioState.partidaId = ultimaPartida.id;
+    sorteioState.numero = ultimaPartida.numero;
+    sorteioState.timeA = (times || []).filter(t => t.time === 'A').map(paraJogador);
+    sorteioState.timeB = (times || []).filter(t => t.time === 'B').map(paraJogador);
+
+    renderSorteio();
+  } else {
+    sorteioState = { partidaId: null, numero: 1, timeA: [], timeB: [] };
+    document.getElementById('sorteio-titulo').textContent = 'Sorteio — 1º jogo';
+    document.getElementById('sorteio-times').style.display = 'none';
+    document.getElementById('btn-sortear').style.display = 'block';
+    document.getElementById('btn-sortear').textContent = 'Sortear times';
+    document.getElementById('btn-nova-partida').style.display = 'none';
+  }
+
+  await atualizarContadorDisponiveis();
+  await carregarJaJogaram();
+}
+
+function montarJogadorComNivel(jogador) {
+  const posicoes = jogador.jogador_posicoes || [];
+  const principal = posicoes.find(p => p.principal) || posicoes[0];
+  return {
+    id: jogador.id,
+    nome: jogador.nome,
+    nivel: principal ? principal.nivel : 3,
+    posicaoLabel: principal ? formatPosicaoLabel(principal.posicao) : 'sem posição'
+  };
+}
+
+async function atualizarContadorDisponiveis() {
+  const { count } = await supabaseClient
+    .from('checkins')
+    .select('*', { count: 'exact', head: true })
+    .eq('sessao_id', currentSessaoId)
+    .eq('status', 'disponivel');
+
+  document.getElementById('sorteio-disponiveis').textContent = `${count || 0} disponíveis`;
+}
+
+async function carregarJaJogaram() {
+  const { data, error } = await supabaseClient
+    .from('checkins')
+    .select('jogador_id, jogadores(id, nome)')
+    .eq('sessao_id', currentSessaoId)
+    .eq('status', 'jogou');
+
+  const section = document.getElementById('ja-jogaram-section');
+  const lista = document.getElementById('lista-ja-jogaram');
+
+  if (error || !data || data.length === 0) {
+    section.style.display = 'none';
+    return;
+  }
+
+  section.style.display = 'block';
+  lista.innerHTML = '';
+  data.forEach(row => {
+    const j = row.jogadores;
+    if (!j) return;
+    const card = document.createElement('div');
+    card.className = 'checkin-card';
+    card.innerHTML = `
+      <div class="checkin-left">
+        <div class="avatar-ring avatar-ring-sm"><div class="avatar-ring-inner">${getInitials(j.nome)}</div></div>
+        <span class="player-name">${escapeHtml(j.nome)}</span>
+      </div>
+      <button class="btn-chegou" onclick="reativarJogador('${j.id}')">Reativar</button>
+    `;
+    lista.appendChild(card);
+  });
+}
+
+async function reativarJogador(jogadorId) {
+  const { error } = await supabaseClient
+    .from('checkins')
+    .update({ status: 'disponivel' })
+    .eq('sessao_id', currentSessaoId)
+    .eq('jogador_id', jogadorId);
+
+  if (error) {
+    console.error(error);
+    showToast('Erro ao reativar jogador.');
+    return;
+  }
+  showToast('Jogador reativado — já entra no próximo sorteio.');
+  await atualizarContadorDisponiveis();
+  await carregarJaJogaram();
+}
+
+async function handleSortear() {
+  const proximoNumero = sorteioState.partidaId ? sorteioState.numero : sorteioState.numero;
+
+  const { data: sessao } = await supabaseClient
+    .from('sessoes_jogo')
+    .select('jogadores_por_time')
+    .eq('id', currentSessaoId)
+    .single();
+  const porTime = (sessao && sessao.jogadores_por_time) || 6;
+  const necessario = porTime * 2;
+
+  const { data: checkins, error } = await supabaseClient
+    .from('checkins')
+    .select('jogador_id, atrasado, horario_chegada, jogadores(id, nome, ativo, jogador_posicoes(posicao, nivel, principal))')
+    .eq('sessao_id', currentSessaoId)
+    .eq('status', 'disponivel')
+    .order('atrasado', { ascending: true })
+    .order('horario_chegada', { ascending: true });
+
+  if (error) {
+    console.error(error);
+    showToast('Erro ao buscar jogadores disponíveis.');
+    return;
+  }
+
+  const candidatos = (checkins || [])
+    .filter(c => c.jogadores && c.jogadores.ativo)
+    .map(c => montarJogadorComNivel(c.jogadores));
+
+  if (candidatos.length < 2) {
+    showToast('Não há jogadores suficientes disponíveis ainda.');
+    return;
+  }
+
+  let selecionados = candidatos.slice(0, necessario);
+  if (selecionados.length % 2 !== 0) selecionados.pop();
+
+  const parceriaMap = await buscarHistoricoParcerias(selecionados.map(s => s.id));
+  const { teamA, teamB } = balancearTimes(selecionados, parceriaMap);
+
+  let repetidas = 0;
+  [teamA, teamB].forEach(time => {
+    for (let i = 0; i < time.length; i++) {
+      for (let j = i + 1; j < time.length; j++) {
+        const key = [time[i].id, time[j].id].sort().join('_');
+        if (parceriaMap.get(key)) repetidas++;
+      }
+    }
+  });
+
+  const { data: partida, error: errPartida } = await supabaseClient
+    .from('partidas')
+    .insert({ sessao_id: currentSessaoId, numero: proximoNumero })
+    .select()
+    .single();
+
+  if (errPartida) {
+    console.error(errPartida);
+    showToast('Erro ao criar a partida.');
+    return;
+  }
+
+  const linhasTimes = [
+    ...teamA.map(j => ({ partida_id: partida.id, time: 'A', jogador_id: j.id })),
+    ...teamB.map(j => ({ partida_id: partida.id, time: 'B', jogador_id: j.id })),
+  ];
+  await supabaseClient.from('partida_times').insert(linhasTimes);
+
+  const parceriasParaGravar = [];
+  [teamA, teamB].forEach(time => {
+    for (let i = 0; i < time.length; i++) {
+      for (let j = i + 1; j < time.length; j++) {
+        const [a, b] = [time[i].id, time[j].id].sort();
+        parceriasParaGravar.push({ jogador_a_id: a, jogador_b_id: b, partida_id: partida.id });
+      }
+    }
+  });
+  if (parceriasParaGravar.length > 0) {
+    await supabaseClient.from('historico_parcerias').insert(parceriasParaGravar);
+  }
+
+  const idsEscalados = selecionados.map(s => s.id);
+  await supabaseClient
+    .from('checkins')
+    .update({ status: 'jogou' })
+    .eq('sessao_id', currentSessaoId)
+    .in('jogador_id', idsEscalados);
+
+  sorteioState = { partidaId: partida.id, numero: partida.numero, timeA, timeB, repetidas };
+  renderSorteio();
+  await atualizarContadorDisponiveis();
+  await carregarJaJogaram();
+  showToast('Times sorteados!');
+}
+
+async function buscarHistoricoParcerias(idsCandidatos) {
+  const desde = new Date();
+  desde.setDate(desde.getDate() - JANELA_DIAS_ANTI_REPETICAO);
+
+  const { data, error } = await supabaseClient
+    .from('historico_parcerias')
+    .select('jogador_a_id, jogador_b_id')
+    .gte('criado_em', desde.toISOString())
+    .or(`jogador_a_id.in.(${idsCandidatos.join(',')}),jogador_b_id.in.(${idsCandidatos.join(',')})`);
+
+  const mapa = new Map();
+  if (error) {
+    console.error(error);
+    return mapa;
+  }
+  (data || []).forEach(row => {
+    const key = [row.jogador_a_id, row.jogador_b_id].sort().join('_');
+    mapa.set(key, (mapa.get(key) || 0) + 1);
+  });
+  return mapa;
+}
+
+function balancearTimes(jogadores, parceriaMap) {
+  const ordenados = [...jogadores].sort((a, b) => b.nivel - a.nivel);
+  const teamA = [];
+  const teamB = [];
+  let somaA = 0;
+  let somaB = 0;
+
+  function penalidade(candidato, time) {
+    let total = 0;
+    time.forEach(t => {
+      const key = [candidato.id, t.id].sort().join('_');
+      total += (parceriaMap.get(key) || 0) * PESO_REPETICAO;
+    });
+    return total;
+  }
+
+  ordenados.forEach(p => {
+    const custoA = somaA + p.nivel + penalidade(p, teamA);
+    const custoB = somaB + p.nivel + penalidade(p, teamB);
+    if (custoA < custoB || (custoA === custoB && teamA.length <= teamB.length)) {
+      teamA.push(p); somaA += p.nivel;
+    } else {
+      teamB.push(p); somaB += p.nivel;
+    }
+  });
+
+  return { teamA, teamB };
+}
+
+function renderSorteio() {
+  document.getElementById('sorteio-titulo').textContent = `Sorteio — ${sorteioState.numero}º jogo`;
+  document.getElementById('sorteio-times').style.display = 'block';
+  document.getElementById('btn-sortear').textContent = 'Sortear novamente';
+  document.getElementById('btn-nova-partida').style.display = 'block';
+
+  renderTimeColuna('time-a-lista', 'time-a-media', sorteioState.timeA, 'A');
+  renderTimeColuna('time-b-lista', 'time-b-media', sorteioState.timeB, 'B');
+
+  const totalRepeticoes = sorteioState.repetidas;
+  const msgEl = document.getElementById('sorteio-anti-repeticao');
+  if (totalRepeticoes === undefined || totalRepeticoes === null) {
+    msgEl.textContent = '';
+  } else if (totalRepeticoes === 0) {
+    msgEl.innerHTML = '<i class="ti ti-refresh" style="font-size:12px; vertical-align:-1px; margin-right:3px"></i>Nenhuma dupla repetida das últimas semanas';
+  } else {
+    msgEl.textContent = `${totalRepeticoes} dupla(s) já jogaram juntas recentemente (inevitável com o grupo de hoje)`;
+  }
+}
+
+function renderTimeColuna(listaId, mediaId, time, letra) {
+  const el = document.getElementById(listaId);
+  el.innerHTML = '';
+  const media = time.length ? (time.reduce((s, j) => s + j.nivel, 0) / time.length).toFixed(1) : '0.0';
+  document.getElementById(mediaId).textContent = `média ${media}`;
+
+  time.forEach(j => {
+    const row = document.createElement('div');
+    row.className = 'team-player';
+    row.onclick = () => trocarJogadorDeTime(j.id, letra);
+    row.innerHTML = `
+      <div class="avatar-ring"><div class="avatar-ring-inner">${getInitials(j.nome)}</div></div>
+      <div class="team-player-info">
+        <div class="team-player-name">${escapeHtml(j.nome)}</div>
+        <div class="team-player-meta">${j.posicaoLabel} · nível ${j.nivel}</div>
+      </div>
+    `;
+    el.appendChild(row);
+  });
+}
+
+async function trocarJogadorDeTime(jogadorId, timeAtual) {
+  const origem = timeAtual === 'A' ? sorteioState.timeA : sorteioState.timeB;
+  const destino = timeAtual === 'A' ? sorteioState.timeB : sorteioState.timeA;
+  const idx = origem.findIndex(j => j.id === jogadorId);
+  if (idx === -1) return;
+  const [jogador] = origem.splice(idx, 1);
+  destino.push(jogador);
+
+  renderSorteio();
+
+  const novoTime = timeAtual === 'A' ? 'B' : 'A';
+  const { error } = await supabaseClient
+    .from('partida_times')
+    .update({ time: novoTime })
+    .eq('partida_id', sorteioState.partidaId)
+    .eq('jogador_id', jogadorId);
+
+  if (error) {
+    console.error(error);
+    showToast('Erro ao mover jogador (mudança pode não ter salvo).');
+  }
+}
+
+async function handleNovaPartida() {
+  sorteioState = { partidaId: null, numero: sorteioState.numero + 1, timeA: [], timeB: [] };
+  document.getElementById('sorteio-titulo').textContent = `Sorteio — ${sorteioState.numero}º jogo`;
+  document.getElementById('sorteio-times').style.display = 'none';
+  document.getElementById('btn-sortear').style.display = 'block';
+  document.getElementById('btn-sortear').textContent = 'Sortear times';
+  document.getElementById('btn-nova-partida').style.display = 'none';
+  await atualizarContadorDisponiveis();
+}
+
 // ---------------- INIT ----------------
 
 function on(id, event, handler) {
@@ -644,6 +1003,9 @@ on('logout-btn', 'click', handleLogout);
 on('nav-elenco', 'click', goToElenco);
 on('nav-cadastro', 'click', goToCadastro);
 on('nav-dia', 'click', goToDia);
+on('nav-sorteio', 'click', goToSorteio);
+on('btn-sortear', 'click', handleSortear);
+on('btn-nova-partida', 'click', handleNovaPartida);
 on('input-jogadores-time', 'change', handleJogadoresPorTimeChange);
 on('btn-add-posicao', 'click', () => addPosicaoRow(false));
 on('btn-salvar-jogador', 'click', handleSalvarJogador);
