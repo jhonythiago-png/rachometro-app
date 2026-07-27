@@ -1165,7 +1165,14 @@ function montarTimes(selecionadosOriginais, parceriaMap, porTime) {
     pool = pool.filter(p => p.id !== jogador.id);
   }
 
-  SLOTS_UNICOS.forEach(slot => {
+  // processa primeiro as posições mais raras no grupo de hoje, pra quem tem
+  // múltiplas posições não ser "roubado" cedo por uma posição mais comum
+  function contarElegiveisNoPool(slot) {
+    return pool.filter(j => j.posicoesTodas.some(p => p.posicao === slot)).length;
+  }
+  const slotsOrdenados = [...SLOTS_UNICOS].sort((a, b) => contarElegiveisNoPool(a) - contarElegiveisNoPool(b));
+
+  slotsOrdenados.forEach(slot => {
     const vezes = slot === 'meio-campo' ? 2 : 1;
     for (let v = 0; v < vezes; v++) {
       // o time que está mais atrás na soma de nível tem prioridade de escolha nessa vaga
@@ -1180,7 +1187,24 @@ function montarTimes(selecionadosOriginais, parceriaMap, porTime) {
     }
   });
 
-  // sobra (posições sem elegível suficiente pra completar os dois times) preenche por nível geral
+  // segunda tentativa: pra quem ainda tem vaga faltando, procura de novo no que sobrou
+  // (cobre o caso de alguém que só ficou livre depois de outra posição ser preenchida)
+  let mudou = true;
+  while (mudou) {
+    mudou = false;
+    for (const time of ['A', 'B']) {
+      for (const slot of SLOTS_UNICOS) {
+        if (necessidade[time][slot] <= 0) continue;
+        const elegiveis = elegiveisPara(slot);
+        if (elegiveis.length === 0) continue;
+        const escolhido = elegiveis[0];
+        atribuir(escolhido.jogador, escolhido.nivelSlot, slot, time);
+        mudou = true;
+      }
+    }
+  }
+
+  // sobra de verdade (ninguém no grupo tem a posição que falta) preenche por nível geral
   pool
     .sort((a, b) => b.nivel - a.nivel)
     .forEach(jOriginal => {
