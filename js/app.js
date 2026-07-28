@@ -274,16 +274,18 @@ function addPosicaoRow(principal = false, valorInicial = null, nivelInicial = nu
   row.className = 'posicao-row';
   row.id = id;
   row.innerHTML = `
-    <select class="posicao-select" onchange="togglePosicaoCustom(this)">
-      ${POSICOES.map(p => `<option value="${p.valor}" ${p.valor === valorInicial ? 'selected' : ''}>${p.label}</option>`).join('')}
-      <option value="${OUTRA_POSICAO}" ${selecionarOutra ? 'selected' : ''}>Outra posição...</option>
-    </select>
-    <input type="text" class="posicao-custom-input" placeholder="Nome da posição"
-      value="${selecionarOutra ? escapeHtml(formatPosicaoLabel(valorInicial)) : ''}"
-      style="display:${selecionarOutra ? 'block' : 'none'}; flex:1.4">
-    <select class="nivel-select">
-      ${[5,4,3,2,1].map(n => `<option value="${n}" ${n === (nivelInicial || 5) ? 'selected' : ''}>Nível ${n}</option>`).join('')}
-    </select>
+    <div class="posicao-fields">
+      <select class="posicao-select" onchange="togglePosicaoCustom(this)">
+        ${POSICOES.map(p => `<option value="${p.valor}" ${p.valor === valorInicial ? 'selected' : ''}>${p.label}</option>`).join('')}
+        <option value="${OUTRA_POSICAO}" ${selecionarOutra ? 'selected' : ''}>Outra posição...</option>
+      </select>
+      <input type="text" class="posicao-custom-input" placeholder="Nome da posição"
+        value="${selecionarOutra ? escapeHtml(formatPosicaoLabel(valorInicial)) : ''}"
+        style="display:${selecionarOutra ? 'block' : 'none'}">
+      <select class="nivel-select">
+        ${[5,4,3,2,1].map(n => `<option value="${n}" ${n === (nivelInicial || 5) ? 'selected' : ''}>Nível ${n}</option>`).join('')}
+      </select>
+    </div>
     ${principal ? '' : `<button type="button" class="remove-btn" onclick="document.getElementById('${id}').remove()">&times;</button>`}
   `;
   if (selecionarOutra) {
