@@ -183,7 +183,7 @@ html, body { height: 100%; overflow: hidden; }
   background: var(--bg-elevated);
   border-top: 1px solid var(--border);
   display: flex;
-  padding: 10px 0 max(12px, env(safe-area-inset-bottom));
+  padding: 10px 0 calc(env(safe-area-inset-bottom) + 18px);
   max-width: 480px;
   width: 100%;
   margin: 0 auto;
