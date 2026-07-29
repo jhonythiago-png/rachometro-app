@@ -432,6 +432,8 @@ function hojeISO() {
 async function goToDia() {
   showView('view-dia');
   setNavActive('nav-dia');
+  const buscaEl = document.getElementById('busca-checkin');
+  if (buscaEl) buscaEl.value = '';
   await loadDia();
 }
 
@@ -464,6 +466,9 @@ async function ensureSessaoHoje() {
   }
   return nova;
 }
+
+let diaJogadoresCache = [];
+let diaCheckinMapCache = {};
 
 async function loadDia() {
   const sessao = await ensureSessaoHoje();
@@ -504,10 +509,23 @@ async function loadDia() {
   const checkinMap = {};
   (checkins || []).forEach(c => { checkinMap[c.jogador_id] = c; });
 
-  renderCheckinLists(jogadores || [], checkinMap);
+  diaJogadoresCache = jogadores || [];
+  diaCheckinMapCache = checkinMap;
+
+  const termoAtual = normalizarTexto(document.getElementById('busca-checkin')?.value.trim() || '');
+  renderCheckinLists(diaJogadoresCache, diaCheckinMapCache, termoAtual);
 }
 
-function renderCheckinLists(jogadores, checkinMap) {
+function normalizarTexto(str) {
+  return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+}
+
+function handleBuscaCheckin() {
+  const termo = normalizarTexto(document.getElementById('busca-checkin').value.trim());
+  renderCheckinLists(diaJogadoresCache, diaCheckinMapCache, termo);
+}
+
+function renderCheckinLists(jogadores, checkinMap, termoBusca = '') {
   const aguardandoEl = document.getElementById('lista-aguardando');
   const chegaramEl = document.getElementById('lista-chegaram');
   const atrasadosEl = document.getElementById('lista-atrasados');
@@ -515,7 +533,7 @@ function renderCheckinLists(jogadores, checkinMap) {
   chegaramEl.innerHTML = '';
   atrasadosEl.innerHTML = '';
 
-  const aguardando = [];
+  let aguardando = [];
   const chegaram = [];
   const atrasados = [];
 
@@ -526,11 +544,17 @@ function renderCheckinLists(jogadores, checkinMap) {
     else chegaram.push({ ...j, horario: c.horario_chegada });
   });
 
+  if (termoBusca) {
+    aguardando = aguardando.filter(j => normalizarTexto(j.nome).includes(termoBusca));
+  }
+
   chegaram.sort((a, b) => new Date(a.horario) - new Date(b.horario));
   atrasados.sort((a, b) => new Date(a.horario) - new Date(b.horario));
 
   if (aguardando.length === 0) {
-    aguardandoEl.innerHTML = '<p class="empty-state">Todo mundo já fez check-in.</p>';
+    aguardandoEl.innerHTML = termoBusca
+      ? '<p class="empty-state">Nenhum jogador encontrado.</p>'
+      : '<p class="empty-state">Todo mundo já fez check-in.</p>';
   } else {
     aguardando.forEach(j => {
       const row = document.createElement('div');
@@ -691,11 +715,13 @@ async function loadHistorico() {
       .select('*', { count: 'exact', head: true })
       .eq('sessao_id', sessao.id);
 
+    const totalPartidas = count || 0;
+    if (totalPartidas === 0) continue;
+
     const dataFormatada = new Date(sessao.data + 'T12:00:00').toLocaleDateString('pt-BR', {
       day: '2-digit', month: 'long', year: 'numeric'
     });
-    const totalPartidas = count || 0;
-    const resumo = totalPartidas === 0 ? 'sem partidas sorteadas' : `${totalPartidas} partida${totalPartidas > 1 ? 's' : ''}`;
+    const resumo = `${totalPartidas} partida${totalPartidas > 1 ? 's' : ''}`;
 
     const card = document.createElement('div');
     card.className = 'historico-card';
@@ -711,6 +737,10 @@ async function loadHistorico() {
       <div class="historico-card-conteudo" id="conteudo-${sessao.id}" style="display:none"></div>
     `;
     container.appendChild(card);
+  }
+
+  if (container.children.length === 0) {
+    container.innerHTML = '<p class="empty-state">Nenhum dia com sorteio registrado ainda.</p>';
   }
 }
 
@@ -1483,6 +1513,7 @@ on('btn-sortear', 'click', handleSortear);
 on('btn-nova-partida', 'click', handleNovaPartida);
 on('btn-resetar-sorteio', 'click', handleResetarSorteio);
 on('input-jogadores-time', 'change', handleJogadoresPorTimeChange);
+on('busca-checkin', 'input', handleBuscaCheckin);
 on('select-modo-selecao', 'change', handleModoSelecaoChange);
 on('btn-add-posicao', 'click', () => addPosicaoRow(false));
 on('btn-salvar-jogador', 'click', handleSalvarJogador);
